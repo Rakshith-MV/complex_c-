@@ -1,4 +1,5 @@
-from sympy import Function, pi, pprint, var, prod, diff, simplify, sqrt
+from scipy.odr import polynomial
+from sympy import Function, pprint, var, prod, diff, simplify, sqrt
 import numpy as np
 
 
@@ -28,32 +29,51 @@ def cubic(xn:list,
     x = var('x')
     n = len(xn)
     h = [xn[i+1] - xn[i] for i in range(n-1)]
-    main_diagonal = np.array([1]+[(h[i] + h[i+1])/3 for i in range(n-2)]+[1])
-    super_diagonal = np.array([0] + [h[i+1]/6 for i in range(n-2)])
-    sub_diagonal = np.array([h[i]/6 for i in range(n-2)]+[0])
+    main_diagonal = np.array([1]+[(h[i] + h[i+1])/3 for i in range(n-2)]+[1], dtype=np.float32)
+    super_diagonal = np.array([0] + [h[i+1]/6 for i in range(n-2)], dtype=np.float32)
+    sub_diagonal = np.array([h[i]/6 for i in range(n-2)]+[0], dtype=np.float32)
     equations = (
     np.diag(sub_diagonal, -1) +
     np.diag(main_diagonal, 0) +
     np.diag(super_diagonal, 1)
     )
-    coeffs = np.hstack(([0], np.array([(yn[i+1]-yn[i])/h[i] -  (yn[i] - yn[i-1])/h[i-1] for i in range(1, n-1)]),[0]))
-    print(equations)
-    print(coeffs, np.shape(coeffs))
-    M = np.linalg.solve(equations, coeffs.reshape(1,n))
-
-    # functions = [
-    #     1/h[i-1]*((xn[i] - x)**3*M[i-1] +(x - xn[i-1])**3*M[i]/6 + (yn[i-1] - h[i-1]**2*M[i-1]/6)*(xn[i] - x) + (yn[i] - h[i-1]**2*M[i]/6)*(x-xn[i-1])) for i in range(1, n-1)
-    # ]
-    # return [f.simplify() for f in functions], [lambda v: i.subs(x,v) for i in functions], [lambda v: diff(i,x).subs(x, v) for i in functions]
+    coeffs = np.hstack(([0]+[(yn[i+1]-yn[i])/h[i] -  (yn[i] - yn[i-1])/h[i-1] for i in range(1, n-1)]+[0]))
+    M = np.linalg.solve(equations.astype(np.float32), coeffs.astype(np.float32))
+    polynomials = [
+        1/h[i] *((xn[i+1] - x)**3*M[i]/6 + (x - xn[i])**3*M[i+1]/6 + (yn[i] - h[i]**2*M[i]/6)*(xn[i+1]-x) +(yn[i+1] - h[i]**2*M[i+1]/6)*(x - xn[i])) for i in range(n-1)
+    ]
+    polynomials = [i.simplify().expand().simplify().simplify() for i in polynomials]
+    dpoly = [i.diff().simplify().expand().simplify().simplify() for i in polynomials]
+    def value(v, I=xn):
+        i = 0
+        try:
+            while not ((v >= I[i]) and (v < I[i+1])):
+                i+=1
+        except IndexError:
+            return 0
+        return polynomials[i].subs(x,v)
+    def dvalue(v, I=xn):
+        i = 0
+        try:
+            while not ((v >= I[i]) and (v <= I[i+1])):
+                i+=1
+        except IndexError:
+            return 0
+        return dpoly[i].subs(x,v)
+    return polynomials, value , dvalue, M 
+    
 
 def test_lagrange():
-    
     ... 
 
 
 if __name__ == "__main__":
-    xn = [0, pi/4, pi/2, 3*pi/4, pi]
-    yn = [0, 1/np.sqrt(2), 1, 1/np.sqrt(2), 0]
-    cubic(xn,yn)
+    xn = [0, np.pi/4, np.pi/2, 3*np.pi/4, np.pi]
+    yn = [0, 1/2**(1/2), 1, 1/2**(1/2), 0]
+    a,b,c,_ = cubic(xn,yn)
+    lagrange(xn, yn)
+    for i in a:
+        print(i)
     x = var('x')
-    # print(c[0](1))
+    print(b((np.pi)/6))
+    print(c((np.pi)/6))

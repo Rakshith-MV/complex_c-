@@ -1,4 +1,4 @@
-from sympy import var, symbols, diff
+from sympy import var, symbols, diff, sympify, E
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import numpy as np
@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 from interpolation import lagrange, hermitian, cubic
-
+from numpy import pi
 
 class InterpolationGUI:
     def __init__(self, root):
@@ -54,7 +54,7 @@ class InterpolationGUI:
                        value="spline", command=self.on_type_change).pack(side=tk.LEFT)
         
         # Point input section
-        ttk.Label(input_frame, text="Input Data (comma-separated):").grid(row=2, column=0, sticky=tk.W, pady=(10, 5))
+        ttk.Label(input_frame, text="Input Data (comma-separated, supports pi, e, ^, sin, cos, etc.):").grid(row=2, column=0, sticky=tk.W, pady=(10, 5))
         
         point_frame = ttk.Frame(input_frame)
         point_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
@@ -180,9 +180,9 @@ class InterpolationGUI:
                 messagebox.showerror("Error", "Please enter both X and Y values")
                 return
             
-            # Split and convert to float
-            x_values = [float(x.strip()) for x in x_input.split(',') if x.strip()]
-            y_values = [float(y.strip()) for y in y_input.split(',') if y.strip()]
+            # Split and convert to float using sympify
+            x_values = [float(sympify(x.strip(), locals={'pi': pi, 'e': E})) for x in x_input.split(',') if x.strip()]
+            y_values = [float(sympify(y.strip(), locals={'pi': pi, 'e': E})) for y in y_input.split(',') if y.strip()]
             
             if len(x_values) != len(y_values):
                 messagebox.showerror("Error", "Number of X and Y values must be equal")
@@ -195,7 +195,7 @@ class InterpolationGUI:
                     messagebox.showerror("Error", "Please enter derivative values for Hermitian interpolation")
                     return
                 
-                deriv_values = [float(d.strip()) for d in deriv_input.split(',') if d.strip()]
+                deriv_values = [float(sympify(d.strip(), locals={'pi': pi, 'e': E})) for d in deriv_input.split(',') if d.strip()]
                 if len(deriv_values) != len(x_values):
                     messagebox.showerror("Error", "Number of derivative values must equal number of points")
                     return
@@ -215,7 +215,7 @@ class InterpolationGUI:
             messagebox.showinfo("Success", f"Added {len(x_values)} points successfully")
             
         except ValueError as e:
-            messagebox.showerror("Error", "Please enter valid numeric values separated by commas")
+            messagebox.showerror("Error", "Please enter valid numeric values or expressions (e.g., 2*pi, e^2, sin(pi/2)) separated by commas")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to add points: {str(e)}")
     
@@ -263,6 +263,16 @@ class InterpolationGUI:
                 text = f"({x}, {y})"
             self.points_listbox.insert(tk.END, text)
     
+    def format_polynomial_clean(self, coeffs):
+        temp = ''
+        n = len(coeffs)
+        print("start polynomials")
+        for i in range(n):
+            print(temp)
+            temp += f" + {coeffs[i]}*x^{n-i-1}"
+        print(temp)
+        return temp[3:-3]  # Remove trailing " + "
+    
     def calculate_interpolation(self):
         """Calculate and display interpolation"""
         if len(self.points) < 2:
@@ -298,9 +308,10 @@ class InterpolationGUI:
             # Calculate interpolation
             if self.interpolation_type.get() == "lagrange":
                 x = var('x')
+                print("Started lagrange")
                 self.current_poly, self.current_func, _ = lagrange(x_vals, y_vals)
                 y_plot = [self.current_func(i) for i in x_plot]
-                
+                print("CComputed lagrange")
                 # Get coefficients for display
                 max_degree = len(x_vals) - 1
                 coeffs = [self.current_poly.coeff(x, i) for i in range(max_degree + 1)]
@@ -323,22 +334,23 @@ class InterpolationGUI:
                 poly_text = f"Hermitian Polynomial:\nP(x) = {polynomial_str}\n\n"
                 
             else:  # Cubic Spline
-                self.current_spline = cubic_spline_interpolation(x_vals, y_vals)
-                y_plot = self.current_spline(x_plot)
+                x = var('x')
+                self.current_poly, self.current_spline, self.current_dspline, self.Mvalues = cubic(x_vals, y_vals)
+                y_plot = [self.current_spline(i) for i in x_plot]
                 
                 # For splines, show piecewise polynomials
-                poly_text = "Cubic Spline Interpolation:\n"
-                poly_text += f"Piecewise cubic polynomials between {len(x_vals)} points\n\n"
+                poly_text = "Cubic Spline Interpolation:\n The M-values are : "
+                for i in self.Mvalues:
+                    poly_text += f"  M_{i} = {self.Mvalues[i]:.3f}, "
+                poly_text += f"\nPiecewise cubic polynomials between {len(x_vals)} points\n\n"
                 
                 # Show the cubic polynomial pieces
                 for i in range(len(x_vals) - 1):
                     poly_text += f"Interval [{x_vals[i]:.3f}, {x_vals[i+1]:.3f}]:\n"
                     # Get coefficients for this piece
-                    c = self.current_spline.c[:, i]  # Coefficients for piece i
-                    polynomial_str = self.format_polynomial_clean(c)
-                    poly_text += f"S_{i}(x) = {polynomial_str}\n"
-                    poly_text += f"(where x is relative to {x_vals[i]})\n\n"
-
+                    coeffs = [self.current_poly[i].coeff(x, j) for j in range(4)]
+                    poly_text += f"  S_{i}(x) = {self.format_polynomial_clean(coeffs)}\n"
+            
             # Plot
             self.ax.clear()
             self.ax.plot(x_plot, y_plot, 'b-', linewidth=2, label=f'{self.interpolation_type.get().title()} Interpolation')
@@ -381,7 +393,7 @@ class InterpolationGUI:
             return
         
         try:
-            x_val = float(self.eval_entry.get())
+            x_val = float(sympify(self.eval_entry.get(), locals={'pi': pi, 'e': np.exp(1)}))
             
             if self.interpolation_type.get() in ["lagrange", "hermitian"]:
                 result = self.current_func(x_val)
@@ -396,7 +408,7 @@ class InterpolationGUI:
             self.canvas.draw()
             
         except ValueError:
-            messagebox.showerror("Error", "Please enter a valid numeric value")
+            messagebox.showerror("Error", "Please enter a valid numeric value or expression (e.g., 2*pi, e^2, sin(pi/2))")
         except Exception as e:
             messagebox.showerror("Error", f"Evaluation failed: {str(e)}")
 
