@@ -1,7 +1,12 @@
 from scipy.odr import polynomial
 from sympy import Function, pprint, var, prod, diff, simplify, sqrt
 import numpy as np
-import numpy as pi
+
+
+from numpy import pi as pi
+
+
+
 
 def lagrange(xn:list,
              yn:list):
@@ -27,42 +32,17 @@ def hermitian(xn: list,
 def cubic(xn:list,
           yn:list
           ):
-    x = var('x')
-    n = len(xn)
-    h = [xn[i+1] - xn[i] for i in range(n-1)]
-    
-    #Define the diagonal elements properly
-    main_diagonal = np.array([1/3*(h[i]+h[i+1]) for i in range(n)], dtype=np.float32)
-    super_diagonal = np.array([0] + [1 for i in range(n-2)], dtype=np.float32)
-    sub_diagonal = np.array([1 for i in range(n-2)]+[0], dtype=np.float32)
-    equations = (
-    np.diag(sub_diagonal, -1) +
-    np.diag(main_diagonal, 0) +
-    np.diag(super_diagonal, 1)
-    )
-    print("Equations:", equations)
-    coeffs = np.hstack(([0]+[(yn[i+1]-yn[i])/h[i] -  (yn[i] - yn[i-1])/h[i-1] for i in range(1, n-1)]+[0]))
-    print("Coefficients:", coeffs)
-    M = np.linalg.solve(equations.astype(np.float32), coeffs.astype(np.float32))
-    polynomials = [
-        1/h[i] *((xn[i+1] - x)**3*M[i]/6 + (x - xn[i])**3*M[i+1]/6 + (yn[i] - h[i]**2*M[i]/6)*(xn[i+1]-x) +(yn[i+1] - h[i]**2*M[i+1]/6)*(x - xn[i])) for i in range(n-1)
-    ]
-    polynomials = [i.simplify().expand().simplify().simplify() for i in polynomials]
-    dpoly = [i.diff().simplify().expand().simplify().simplify() for i in polynomials]
-    def value(v, I=xn):
-        i = 0
-        try:
-            while not ((v >= I[i]) and (v < I[i+1])):
-                i+=1
-        except IndexError:
-            return 0
-        return polynomials[i].subs(x,v)
-    def dvalue(v, I=xn):
-        i = 0
-        try:
-            while not ((v >= I[i]) and (v <= I[i+1])):
-                i+=1
-        except IndexError:
-            return 0
-        return dpoly[i].subs(x,v)
-    return polynomials, value , dvalue, M 
+    return "Not Yet implemented"
+
+
+def newton(xn: list,
+              yn: list):
+    ...
+
+
+
+
+
+if __name__ == "__main__":
+    x= [0, pi/4 , pi/2 , 3*pi/4, pi]
+    y = [0, 1/sqrt(2), 1, 1/sqrt(2),0]

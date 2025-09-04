@@ -1,0 +1,6 @@
+Good,
+
+Lagrange, Hermitian
+
+Double: Trapezoidal, simpson
+simpson 38th is soo wrong

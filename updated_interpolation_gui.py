@@ -1,19 +1,21 @@
-from sympy import var, symbols, diff
+from sympy import var, symbols, diff, sympify, E, sin, cos, tan, log, sqrt, exp
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
-from interpolation import lagrange, hermitian
-from scipy.interpolate import CubicSpline
+from interpolation import lagrange, hermitian, cubic
+from ndiff import integrate
+from numpy import pi
+from support import string_to_function
 
 
 class InterpolationGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Interpolation Calculator")
-        self.root.geometry("1200x800")
+        self.root.title("Interpolation & Integration Calculator")
+        self.root.geometry("1400x900")
         
         # Variables
         self.points = []
@@ -23,16 +25,32 @@ class InterpolationGUI:
         self.current_func = None
         self.current_spline = None
         
+        # Integration variables
+        self.integration_type = tk.StringVar(value="single")
+        self.integration_method = tk.StringVar(value="simpsons13")
+        self.integration_results = None
+        
         self.setup_gui()
         
     def setup_gui(self):
+        # Create main notebook for tabs
+        self.main_notebook = ttk.Notebook(self.root)
+        self.main_notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Create interpolation and integration tabs
+        self.setup_interpolation_tab()
+        self.setup_integration_tab()
+        
+    def setup_interpolation_tab(self):
+        """Setup the interpolation tab (existing functionality)"""
+        interpolation_frame = ttk.Frame(self.main_notebook)
+        self.main_notebook.add(interpolation_frame, text="Interpolation")
+        
         # Main frame
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        main_frame = ttk.Frame(interpolation_frame, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Configure grid weights
-        self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
         main_frame.rowconfigure(0, weight=1)
         
@@ -55,7 +73,7 @@ class InterpolationGUI:
                        value="spline", command=self.on_type_change).pack(side=tk.LEFT)
         
         # Point input section
-        ttk.Label(input_frame, text="Input Data (comma-separated):").grid(row=2, column=0, sticky=tk.W, pady=(10, 5))
+        ttk.Label(input_frame, text="Input Data (comma-separated, supports pi, e, ^, sin, cos, etc.):").grid(row=2, column=0, sticky=tk.W, pady=(10, 5))
         
         point_frame = ttk.Frame(input_frame)
         point_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
@@ -139,6 +157,10 @@ class InterpolationGUI:
         self.ax = self.fig.add_subplot(111)
         
         self.canvas = FigureCanvasTkAgg(self.fig, plot_frame)
+        
+        self.toolbar = NavigationToolbar2Tk(self.canvas, plot_frame)
+        self.toolbar.pack(side=tk.TOP, fill=tk.X)
+        
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         
         # Polynomial tab
@@ -151,6 +173,296 @@ class InterpolationGUI:
         # Initialize display
         self.on_type_change()
         
+    def setup_integration_tab(self):
+        """Setup the numerical integration tab"""
+        integration_frame = ttk.Frame(self.main_notebook)
+        self.main_notebook.add(integration_frame, text="Numerical Integration")
+        
+        # Main frame
+        main_frame = ttk.Frame(integration_frame, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Configure grid weights
+        main_frame.columnconfigure(1, weight=1)
+        main_frame.rowconfigure(0, weight=1)
+        
+        # Left panel for integration inputs
+        input_frame = ttk.LabelFrame(main_frame, text="Integration Parameters", padding="10")
+        input_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
+        
+        # Integration type selection
+        ttk.Label(input_frame, text="Integration Type:").grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
+        
+        type_frame = ttk.Frame(input_frame)
+        type_frame.grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+        
+        ttk.Radiobutton(type_frame, text="Single Integral", variable=self.integration_type, 
+                       value="single", command=self.on_integration_type_change).pack(side=tk.LEFT, padx=(0, 15))
+        ttk.Radiobutton(type_frame, text="Double Integral", variable=self.integration_type, 
+                       value="double", command=self.on_integration_type_change).pack(side=tk.LEFT)
+        
+        # Method selection
+        ttk.Label(input_frame, text="Integration Method:").grid(row=2, column=0, sticky=tk.W, pady=(10, 5))
+        
+        method_frame = ttk.Frame(input_frame)
+        method_frame.grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+        
+        methods_row1 = ttk.Frame(method_frame)
+        methods_row1.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Radiobutton(methods_row1, text="Simpson's 1/3", variable=self.integration_method, 
+                       value="simpsons_1/3rd").pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Radiobutton(methods_row1, text="Trapezoidal", variable=self.integration_method, 
+                       value="trapezoidal").pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Radiobutton(methods_row1, text="Simpson's 3/8", variable=self.integration_method, 
+                       value="simpsons_3/8th").pack(side=tk.LEFT)
+
+        methods_row2 = ttk.Frame(method_frame)
+        methods_row2.pack(fill=tk.X)
+        
+        ttk.Radiobutton(methods_row2, text="Gaussian", variable=self.integration_method, 
+                       value="gaussian").pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Radiobutton(methods_row2, text="Romberg", variable=self.integration_method, 
+                       value="romberg").pack(side=tk.LEFT)
+        
+        # Function input
+        ttk.Label(input_frame, text="Function f(x) or f(x,y):").grid(row=4, column=0, sticky=tk.W, pady=(15, 5))
+        ttk.Label(input_frame, text="(Use x, y, pi, e, sin, cos, exp, log, sqrt, etc.)").grid(row=5, column=0, sticky=tk.W, pady=(0, 5))
+        
+        self.function_entry = ttk.Entry(input_frame, width=50)
+        self.function_entry.grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 15))
+        
+        # Single integral parameters
+        self.single_frame = ttk.LabelFrame(input_frame, text="Single Integral Parameters", padding="5")
+        self.single_frame.grid(row=7, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        
+        single_grid = ttk.Frame(self.single_frame)
+        single_grid.pack(fill=tk.X)
+        
+        ttk.Label(single_grid, text="x₀:").grid(row=0, column=0, padx=(0, 5), sticky=tk.W)
+        self.x0_entry = ttk.Entry(single_grid, width=10)
+        self.x0_entry.grid(row=0, column=1, padx=(0, 15))
+        
+        ttk.Label(single_grid, text="xₙ:").grid(row=0, column=2, padx=(0, 5), sticky=tk.W)
+        self.xn_entry = ttk.Entry(single_grid, width=10)
+        self.xn_entry.grid(row=0, column=3, padx=(0, 15))
+        
+        ttk.Label(single_grid, text="h:").grid(row=0, column=4, padx=(0, 5), sticky=tk.W)
+        self.h_single_entry = ttk.Entry(single_grid, width=10)
+        self.h_single_entry.grid(row=0, column=5)
+        
+        # Double integral parameters
+        self.double_frame = ttk.LabelFrame(input_frame, text="Double Integral Parameters", padding="5")
+        self.double_frame.grid(row=8, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        
+        double_grid = ttk.Frame(self.double_frame)
+        double_grid.pack(fill=tk.X)
+        
+        # First row
+        ttk.Label(double_grid, text="x₀:").grid(row=0, column=0, padx=(0, 5), sticky=tk.W)
+        self.x0_double_entry = ttk.Entry(double_grid, width=8)
+        self.x0_double_entry.grid(row=0, column=1, padx=(0, 10))
+        
+        ttk.Label(double_grid, text="xₙ:").grid(row=0, column=2, padx=(0, 5), sticky=tk.W)
+        self.xn_double_entry = ttk.Entry(double_grid, width=8)
+        self.xn_double_entry.grid(row=0, column=3, padx=(0, 10))
+        
+        ttk.Label(double_grid, text="h:").grid(row=0, column=4, padx=(0, 5), sticky=tk.W)
+        self.h_double_entry = ttk.Entry(double_grid, width=8)
+        self.h_double_entry.grid(row=0, column=5, padx=(0, 10))
+        
+        # Second row
+        ttk.Label(double_grid, text="y₀:").grid(row=1, column=0, padx=(0, 5), sticky=tk.W, pady=(5, 0))
+        self.y0_entry = ttk.Entry(double_grid, width=8)
+        self.y0_entry.grid(row=1, column=1, padx=(0, 10), pady=(5, 0))
+        
+        ttk.Label(double_grid, text="yₙ:").grid(row=1, column=2, padx=(0, 5), sticky=tk.W, pady=(5, 0))
+        self.yn_entry = ttk.Entry(double_grid, width=8)
+        self.yn_entry.grid(row=1, column=3, padx=(0, 10), pady=(5, 0))
+        
+        ttk.Label(double_grid, text="k:").grid(row=1, column=4, padx=(0, 5), sticky=tk.W, pady=(5, 0))
+        self.k_entry = ttk.Entry(double_grid, width=8)
+        self.k_entry.grid(row=1, column=5, padx=(0, 10), pady=(5, 0))
+        
+        # Calculate button
+        calculate_button = ttk.Button(input_frame, text="Calculate Integration", 
+                                    command=self.calculate_integration)
+        calculate_button.grid(row=9, column=0, columnspan=2, pady=(15, 0))
+        
+        # Clear button
+        clear_button = ttk.Button(input_frame, text="Clear All", 
+                                command=self.clear_integration)
+        clear_button.grid(row=10, column=0, columnspan=2, pady=(5, 0))
+        
+        # Right panel for results
+        right_frame = ttk.Frame(main_frame)
+        right_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
+        right_frame.columnconfigure(0, weight=1)
+        right_frame.rowconfigure(0, weight=1)
+        
+        # Results notebook
+        self.integration_notebook = ttk.Notebook(right_frame)
+        self.integration_notebook.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Results tab
+        results_frame = ttk.Frame(self.integration_notebook)
+        self.integration_notebook.add(results_frame, text="Results")
+        
+        # Results display
+        self.integration_results_text = scrolledtext.ScrolledText(results_frame, wrap=tk.WORD, height=25)
+        self.integration_results_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Array output tab
+        array_frame = ttk.Frame(self.integration_notebook)
+        self.integration_notebook.add(array_frame, text="Array Output")
+        
+        self.array_output_text = scrolledtext.ScrolledText(array_frame, wrap=tk.WORD, height=25)
+        self.array_output_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Plot tab for integration
+        integration_plot_frame = ttk.Frame(self.integration_notebook)
+        self.integration_notebook.add(integration_plot_frame, text="Plot")
+        
+        # Create matplotlib figure for integration
+        self.integration_fig = Figure(figsize=(10, 7), dpi=100)
+        self.integration_ax = self.integration_fig.add_subplot(111)
+        
+        self.integration_canvas = FigureCanvasTkAgg(self.integration_fig, integration_plot_frame)
+        
+        self.integration_toolbar = NavigationToolbar2Tk(self.integration_canvas, integration_plot_frame)
+        self.integration_toolbar.pack(side=tk.TOP, fill=tk.X)
+        
+        self.integration_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # Initialize integration display
+        self.on_integration_type_change()
+        
+    def on_integration_type_change(self):
+        """Handle integration type change"""
+        if self.integration_type.get() == "single":
+            self.single_frame.grid()
+            self.double_frame.grid_remove()
+        else:
+            self.single_frame.grid_remove()
+            self.double_frame.grid()
+    
+    def clear_integration(self):
+        """Clear all integration inputs and results"""
+        # Clear input fields
+        self.function_entry.delete(0, tk.END)
+        self.x0_entry.delete(0, tk.END)
+        self.xn_entry.delete(0, tk.END)
+        self.h_single_entry.delete(0, tk.END)
+        self.x0_double_entry.delete(0, tk.END)
+        self.xn_double_entry.delete(0, tk.END)
+        self.h_double_entry.delete(0, tk.END)
+        self.y0_entry.delete(0, tk.END)
+        self.yn_entry.delete(0, tk.END)
+        self.k_entry.delete(0, tk.END)
+        
+        # Clear results
+        self.integration_results_text.delete(1.0, tk.END)
+        self.array_output_text.delete(1.0, tk.END)
+        
+        # Clear plot
+        self.integration_ax.clear()
+        self.integration_canvas.draw()
+        
+        self.integration_results = None
+    
+    def calculate_integration(self):
+        """Calculate numerical integration - placeholder for now"""
+        try:
+            function_str = self.function_entry.get().strip()
+            if not function_str:
+                messagebox.showerror("Error", "Please enter a function")
+                return
+            
+            # Get parameters based on integration type
+            if self.integration_type.get() == "single":
+                try:
+                    x0 = float(sympify(self.x0_entry.get(), locals={'pi': pi, 'e': E}))
+                    xn = float(sympify(self.xn_entry.get(), locals={'pi': pi, 'e': E}))
+                    h = float(sympify(self.h_single_entry.get(), locals={'pi': pi, 'e': E}))
+                    
+                    if not all([self.x0_entry.get(), self.xn_entry.get(), self.h_single_entry.get()]):
+                        messagebox.showerror("Error", "Please fill all single integral parameters")
+                        return
+                    
+
+                    # Display input parameters
+                    results_text = f"Single Integration - {self.integration_method.get().replace('_', ' ').title()}\n"
+                    results_text += f"Function: f(x) = {function_str}\n"
+                    results_text += f"Limits: x₀ = {x0}, xₙ = {xn}\n"
+                    results_text += f"Step size: h = {h}\n\n"
+                    results_text += ""
+                    results_text += "TODO: Implement integration methods:\n"
+                    results_text += f"- {self.integration_method.get().replace('_', ' ').title()} method\n"
+                    
+                except ValueError:
+                    messagebox.showerror("Error", "Please enter valid numeric values for single integral parameters")
+                    return
+                    
+            else:  # Double integral
+                try:
+                    f = string_to_function(function_str, integration_type="double")
+                    x0 = float(sympify(self.x0_double_entry.get(), locals={'pi': pi, 'e': E}))
+                    xn = float(sympify(self.xn_double_entry.get(), locals={'pi': pi, 'e': E}))
+                    y0 = float(sympify(self.y0_entry.get(), locals={'pi': pi, 'e': E}))
+                    yn = float(sympify(self.yn_entry.get(), locals={'pi': pi, 'e': E}))
+                    h = float(sympify(self.h_double_entry.get(), locals={'pi': pi, 'e': E}))
+                    k = float(sympify(self.k_entry.get(), locals={'pi': pi, 'e': E}))
+                    
+                    if not all([self.x0_double_entry.get(), self.xn_double_entry.get(), 
+                               self.y0_entry.get(), self.yn_entry.get(),
+                               self.h_double_entry.get(), self.k_entry.get()]):
+                        messagebox.showerror("Error", "Please fill all double integral parameters")
+                        return
+
+                    xlen = int((xn - x0) / h)+1
+                    ylen = int((yn-y0)/h) +1
+                    integral = integrate(x0,xn,y0,yn,f,h,k)
+                    
+                    # Display input parameters
+                    results_text = f"Double Integration - {self.integration_method.get().replace('_', ' ').title()}\n"
+                    results_text += f"Function: f(x,y) = {function_str}\n"
+                    results_text += f"X limits: x₀ = {x0}, xₙ = {xn}, h = {h}\n"
+                    results_text += f"Y limits: y₀ = {y0}, yₙ = {yn}, k = {k}\n\n"
+                    results_text += f"The integral is {integral[self.integration_method.get()].integral_value}\n"
+                    results_text += f"- {self.integration_method.get().replace('_', ' ').title()} method\n"
+                    
+                except ValueError:
+                    messagebox.showerror("Error", "Please enter valid numeric values for double integral parameters")
+                    return
+            
+            # Display results (placeholder)
+            self.integration_results_text.delete(1.0, tk.END)
+            self.integration_results_text.insert(1.0, results_text)
+            
+            array_text = "Function values:\n"
+            for i,j in enumerate(integral[self.integration_method.get()].data):
+                array_text += str(round(j, 4)) + '  '
+                array_text += ((i+1)%ylen == 0)*"\n"
+            
+            self.array_output_text.delete(1.0, tk.END)
+            self.array_output_text.insert(1.0, array_text)
+            
+            messagebox.showinfo("Success", f"Integration setup complete for {self.integration_method.get().replace('_', ' ').title()} method")
+            
+            x_val = [x0+i*h for i in range(xlen)]
+            y_val = [y0+i*h for i in range(ylen)]
+            f_val = [[f(i,j) for i in x_val] for j in y_val]
+            
+            # self.ax.clear()
+            # self.ax.plot_surface(x_val, y_val, f_val, cmap='viridis')
+            # self.ax.legend()
+            # self.canvas.draw()
+
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Integration setup failed: {str(e)}")
+    
+    # Keep all existing interpolation methods unchanged
     def on_type_change(self):
         """Handle interpolation type change"""
         if self.interpolation_type.get() == "hermitian":
@@ -177,9 +489,9 @@ class InterpolationGUI:
                 messagebox.showerror("Error", "Please enter both X and Y values")
                 return
             
-            # Split and convert to float
-            x_values = [float(x.strip()) for x in x_input.split(',') if x.strip()]
-            y_values = [float(y.strip()) for y in y_input.split(',') if y.strip()]
+            # Split and convert to float using sympify
+            x_values = [float(sympify(x.strip(), locals={'pi': pi, 'e': E})) for x in x_input.split(',') if x.strip()]
+            y_values = [float(sympify(y.strip(), locals={'pi': pi, 'e': E})) for y in y_input.split(',') if y.strip()]
             
             if len(x_values) != len(y_values):
                 messagebox.showerror("Error", "Number of X and Y values must be equal")
@@ -192,7 +504,7 @@ class InterpolationGUI:
                     messagebox.showerror("Error", "Please enter derivative values for Hermitian interpolation")
                     return
                 
-                deriv_values = [float(d.strip()) for d in deriv_input.split(',') if d.strip()]
+                deriv_values = [float(sympify(d.strip(), locals={'pi': pi, 'e': E})) for d in deriv_input.split(',') if d.strip()]
                 if len(deriv_values) != len(x_values):
                     messagebox.showerror("Error", "Number of derivative values must equal number of points")
                     return
@@ -212,7 +524,7 @@ class InterpolationGUI:
             messagebox.showinfo("Success", f"Added {len(x_values)} points successfully")
             
         except ValueError as e:
-            messagebox.showerror("Error", "Please enter valid numeric values separated by commas")
+            messagebox.showerror("Error", "Please enter valid numeric values or expressions (e.g., 2*pi, e^2, sin(pi/2)) separated by commas")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to add points: {str(e)}")
     
@@ -260,75 +572,16 @@ class InterpolationGUI:
                 text = f"({x}, {y})"
             self.points_listbox.insert(tk.END, text)
     
-    def cubic_spline_interpolation(self, x_vals, y_vals):
-        """Create cubic spline interpolation"""
-        # Sort points by x value
-        sorted_indices = np.argsort(x_vals)
-        x_sorted = np.array(x_vals)[sorted_indices]
-        y_sorted = np.array(y_vals)[sorted_indices]
-        
-        # Create cubic spline
-        spline = CubicSpline(x_sorted, y_sorted)
-        return spline
-    
-    def format_polynomial_clean(self, coeffs, var_name='x'):
-        """Format polynomial coefficients as a clean readable string"""
-        if not coeffs or all(abs(c) < 1e-10 for c in coeffs):
-            return "0"
-        
-        terms = []
+    def format_polynomial_clean(self, coeffs):
+        temp = ''
         n = len(coeffs)
-        
-        for i, coeff in enumerate(coeffs):
-            if abs(coeff) < 1e-10:  # Skip near-zero coefficients
-                continue
-                
-            power = n - 1 - i
-            
-            # Round coefficient for cleaner display
-            coeff_rounded = round(float(coeff), 6)
-            if abs(coeff_rounded) < 1e-6:
-                continue
-            
-            # Handle sign and coefficient value
-            if len(terms) == 0:
-                # First term
-                if power == 0:
-                    terms.append(f"{coeff_rounded}")
-                elif power == 1:
-                    if abs(coeff_rounded - 1) < 1e-10:
-                        terms.append(f"{var_name}")
-                    elif abs(coeff_rounded + 1) < 1e-10:
-                        terms.append(f"-{var_name}")
-                    else:
-                        terms.append(f"{coeff_rounded}{var_name}")
-                else:
-                    if abs(coeff_rounded - 1) < 1e-10:
-                        terms.append(f"{var_name}^{power}")
-                    elif abs(coeff_rounded + 1) < 1e-10:
-                        terms.append(f"-{var_name}^{power}")
-                    else:
-                        terms.append(f"{coeff_rounded}{var_name}^{power}")
-            else:
-                # Subsequent terms
-                sign = " + " if coeff_rounded > 0 else " - "
-                abs_coeff = abs(coeff_rounded)
-                
-                if power == 0:
-                    terms.append(f"{sign}{abs_coeff}")
-                elif power == 1:
-                    if abs(abs_coeff - 1) < 1e-10:
-                        terms.append(f"{sign}{var_name}")
-                    else:
-                        terms.append(f"{sign}{abs_coeff}{var_name}")
-                else:
-                    if abs(abs_coeff - 1) < 1e-10:
-                        terms.append(f"{sign}{var_name}^{power}")
-                    else:
-                        terms.append(f"{sign}{abs_coeff}{var_name}^{power}")
-        
-        return "".join(terms) if terms else "0"
-            
+        # print("start polynomials")
+        for i in range(n):
+            if(coeffs[i]!=0):
+                temp += f" + {coeffs[i]}*x^{n-i-1}"
+        # print(temp)
+        return temp[3:-3]  # Remove trailing " + "
+    
     def calculate_interpolation(self):
         """Calculate and display interpolation"""
         if len(self.points) < 2:
@@ -364,9 +617,10 @@ class InterpolationGUI:
             # Calculate interpolation
             if self.interpolation_type.get() == "lagrange":
                 x = var('x')
+                print("Started lagrange")
                 self.current_poly, self.current_func, _ = lagrange(x_vals, y_vals)
                 y_plot = [self.current_func(i) for i in x_plot]
-                
+                print("CComputed lagrange")
                 # Get coefficients for display
                 max_degree = len(x_vals) - 1
                 coeffs = [self.current_poly.coeff(x, i) for i in range(max_degree + 1)]
@@ -389,22 +643,23 @@ class InterpolationGUI:
                 poly_text = f"Hermitian Polynomial:\nP(x) = {polynomial_str}\n\n"
                 
             else:  # Cubic Spline
-                self.current_spline = self.cubic_spline_interpolation(x_vals, y_vals)
-                y_plot = self.current_spline(x_plot)
+                x = var('x')
+                self.current_poly, self.current_spline, self.current_dspline, self.Mvalues = cubic(x_vals, y_vals)
+                y_plot = [self.current_spline(i) for i in x_plot]
                 
                 # For splines, show piecewise polynomials
-                poly_text = "Cubic Spline Interpolation:\n"
-                poly_text += f"Piecewise cubic polynomials between {len(x_vals)} points\n\n"
+                poly_text = "Cubic Spline Interpolation:\n The M-values are : "
+                for i in self.Mvalues:
+                    poly_text += f"  M_{i} = {self.Mvalues[i]:.3f}, "
+                poly_text += f"\nPiecewise cubic polynomials between {len(x_vals)} points\n\n"
                 
                 # Show the cubic polynomial pieces
                 for i in range(len(x_vals) - 1):
                     poly_text += f"Interval [{x_vals[i]:.3f}, {x_vals[i+1]:.3f}]:\n"
                     # Get coefficients for this piece
-                    c = self.current_spline.c[:, i]  # Coefficients for piece i
-                    polynomial_str = self.format_polynomial_clean(c)
-                    poly_text += f"S_{i}(x) = {polynomial_str}\n"
-                    poly_text += f"(where x is relative to {x_vals[i]})\n\n"
-
+                    coeffs = [self.current_poly[i].coeff(x, j) for j in range(4)]
+                    poly_text += f"  S_{i}(x) = {self.format_polynomial_clean(coeffs)}\n"
+            
             # Plot
             self.ax.clear()
             self.ax.plot(x_plot, y_plot, 'b-', linewidth=2, label=f'{self.interpolation_type.get().title()} Interpolation')
@@ -447,13 +702,13 @@ class InterpolationGUI:
             return
         
         try:
-            x_val = float(self.eval_entry.get())
+            x_val = float(sympify(self.eval_entry.get(), locals={'pi': pi, 'e': np.exp(1)}))
             
             if self.interpolation_type.get() in ["lagrange", "hermitian"]:
                 result = self.current_func(x_val)
             else:  # Cubic Spline
                 result = float(self.current_spline(x_val))
-            
+
             self.eval_result.config(text=f"Result: f({x_val}) = {result:.6f}")
             
             # Add evaluation point to plot
@@ -462,10 +717,10 @@ class InterpolationGUI:
             self.canvas.draw()
             
         except ValueError:
-            messagebox.showerror("Error", "Please enter a valid numeric value")
+            messagebox.showerror("Error", "Please enter a valid numeric value or expression (e.g., 2*pi, e^2, sin(pi/2))")
         except Exception as e:
             messagebox.showerror("Error", f"Evaluation failed: {str(e)}")
-
+       
 if __name__ == "__main__":
     root = tk.Tk()
     app = InterpolationGUI(root)
