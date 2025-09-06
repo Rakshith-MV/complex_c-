@@ -6,9 +6,24 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 from interpolation import lagrange, hermitian, cubic
-from nintegration import dintegrate, sintegrate, trapezoidal1d_integrate, trapezoidal2d_integrate, simpsons1d_integrate , simpsons2d_integrate, simpsons381d_integrate, simpsons382d_integrate
+from nintegration import dintegrate, simpsons382d_integrate, sintegrate, trapezoidal1d_integrate, trapezoidal2d_integrate, simpsons1d_integrate , simpsons2d_integrate,  simpsons381d_integrate, simpsons382d_integrate, gaussian, romberg_integration
 from numpy import pi
 from support import string_to_function
+
+singlefunctions = {
+    'trapezoidal':trapezoidal1d_integrate,
+    'simpsons':simpsons1d_integrate,
+    'simpsons38':simpsons381d_integrate,
+    'gaussian':gaussian,
+    'romberg':romberg_integration,
+    'all':sintegrate
+}
+doublefunctions = {
+    'trapezoidal':trapezoidal2d_integrate,
+    'simpsons':simpsons2d_integrate,
+    'simpsons38':simpsons382d_integrate,
+    'all':dintegrate
+}
 
 class InterpolationGUI:
     def __init__(self, root):
@@ -207,11 +222,11 @@ class InterpolationGUI:
         methods_row1.pack(fill=tk.X, pady=(0, 5))
         
         ttk.Radiobutton(methods_row1, text="Simpson's 1/3", variable=self.integration_method, 
-                       value="simpsons_1/3rd").pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Radiobutton(methods_row1, text="Trapezoidal", variable=self.integration_method, 
+                       value="simpsons").pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Radiobutton(methods_row1, text="trapezoidal", variable=self.integration_method, 
                        value="trapezoidal").pack(side=tk.LEFT, padx=(0, 10))
         ttk.Radiobutton(methods_row1, text="Simpson's 3/8", variable=self.integration_method, 
-                       value="simpsons_3/8th").pack(side=tk.LEFT)
+                       value="simpsons38").pack(side=tk.LEFT)
 
         methods_row2 = ttk.Frame(method_frame)
         methods_row2.pack(fill=tk.X)
@@ -379,29 +394,30 @@ class InterpolationGUI:
             # Get parameters based on integration type
             if self.integration_type.get() == "single":
                 try:
+                    f = string_to_function(function_str)
                     x0 = float(sympify(self.x0_entry.get(), locals={'pi': pi, 'e': E}))
                     xn = float(sympify(self.xn_entry.get(), locals={'pi': pi, 'e': E}))
                     h = float(sympify(self.h_single_entry.get(), locals={'pi': pi, 'e': E}))
 
-                    single_integral = sintegrate(x0, xn, h, string_to_function(function_str, integration_type="single"))
-
-                    if not all([self.x0_entry.get(), self.xn_entry.get(), self.h_single_entry.get()]):
-                        messagebox.showerror("Error", "Please fill all single integral parameters")
-                        return
-                    
-
-                    # Display input parameters
-                    results_text = f"Single Integration - {self.integration_method.get().replace('_', ' ').title()}\n"
-                    results_text += f"Function: f(x) = {function_str}\n"
-                    results_text += f"Limits: x₀ = {x0}, xₙ = {xn}\n"
-                    results_text += f"Step size: h = {h}\n\n"
-                    results_text += f"The integral is {single_integral[self.integration_method.get()]['integral_value']}\n"
-                    results_text += f"- {self.integration_method.get().replace('_', ' ').title()} method\n" 
-                    
-                except ValueError:
+                    if(self.integration_method.get() != 'romberg'):
+                        results_text = f"Single Integration - {self.integration_method.get().replace('_', ' ').title()}\n"
+                        results_text += f"Function: f(x) = {function_str}\n"
+                        results_text += f"Limits: x₀ = {x0}, xₙ = {xn}\n"    
+                        if(self.integration_method.get() != 'gaussian'):
+                            if not all([self.x0_entry.get(), self.xn_entry.get(), self.h_single_entry.get()]):
+                                messagebox.showerror("Error", "Please fill all single integral parameters")
+                                return
+                            results_text += f"Step size: h = {h}\n\n"
+                            results_text += f"The integral is {  singlefunctions[self.integration_method.get()](x0,xn,h,f)['integral_value']}\n"
+                        else:
+                            if not all([self.x0_entry.get(), self.xn_entry.get()]):
+                                messagebox.showerror("Error", "Please fill all single integral parameters")
+                                return
+                            val = singlefunctions[self.integration_method.get()](f,x0,xn)
+                            results_text += f"The integral under 2 points {val['two']}, 3 points : {val['three']}\n"
+                except:
                     messagebox.showerror("Error", "Please enter valid numeric values for single integral parameters")
                     return
-                    
             else:  # Double integral
                 try:
                     f = string_to_function(function_str, integration_type="double")
@@ -411,26 +427,21 @@ class InterpolationGUI:
                     yn = float(sympify(self.yn_entry.get(), locals={'pi': pi, 'e': E}))
                     h = float(sympify(self.h_double_entry.get(), locals={'pi': pi, 'e': E}))
                     k = float(sympify(self.k_entry.get(), locals={'pi': pi, 'e': E}))
-                    
-                    if not all([self.x0_double_entry.get(), self.xn_double_entry.get(), 
-                               self.y0_entry.get(), self.yn_entry.get(),
-                               self.h_double_entry.get(), self.k_entry.get()]):
-                        messagebox.showerror("Error", "Please fill all double integral parameters")
-                        return
 
-                    xlen = int((xn - x0) / h)+1
-                    ylen = int((yn-y0)/h) +1
-                    if self.integration_method.get() == "Simpson's 2D":
-                        integral = simpsons2d_integrate(x0,xn,y0,yn,f,h,k)
-                    elif self.integration_method.get() == "":
-                        integral = trapezoidal1d_integrate(x0,xn,y0,yn,f,h,k)
-                    elif self.integration_method.get() == "":
-                        integral = simpsons382d_integrate(x0,xn,y0,yn,f,h,k)
-                    else:
-                        integral = dintegrate(x0,xn,y0,yn,f,h,k)
-                    
+
+                    if(self.integration_method.get() not in  ['romberg', 'gaussian','all']):
+                        if not all([self.x0_double_entry.get(), self.xn_double_entry.get(),
+                            self.y0_entry.get(), self.yn_entry.get(),
+                            self.h_double_entry.get(), self.k_entry.get()]):
+                            messagebox.showerror("Error", "Please fill all double integral parameters")
+                            return
+
+                        xlen = int((xn - x0) / h)+1
+                        ylen = int((yn-y0)/h) +1
+                        
+                        integral = doublefunctions[self.integration_method.get()](x0, xn, y0, yn, h, k, f)    
                     if self.integration_method.get() != 'all':
-                        string = f"The integral in {self.integration_method.get()} method is {integral[self.integration_method.get()]['integral_value']}\n" 
+                        string = f"The integral in {self.integration_method.get()} method is {integral['integral_value']}\n" 
                     else:
                         string = ''
                         for i,j in integral.items():
@@ -440,8 +451,7 @@ class InterpolationGUI:
                     results_text += f"Function: f(x,y) = {function_str}\n"
                     results_text += f"X limits: x₀ = {x0}, xₙ = {xn}, h = {h}\n"
                     results_text += f"Y limits: y₀ = {y0}, yₙ = {yn}, k = {k}\n\n"
-                    results_text += string
-                    
+                    results_text += f"The integral is {integral['integral_value']}"
                 except ValueError:
                     messagebox.showerror("Error", "Please enter valid numeric values for double integral parameters")
                     return
@@ -451,7 +461,7 @@ class InterpolationGUI:
             self.integration_results_text.insert(1.0, results_text)
             
             array_text = "Function values:\n"
-            for i,j in enumerate(integral[self.integration_method.get()]['data']):
+            for i,j in enumerate(integral['data']):
                 array_text += str(round(j, 4)) + '  '
                 array_text += ((i+1)%ylen == 0)*"\n"
             

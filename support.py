@@ -1,5 +1,3 @@
-
-
 def string_to_function(function_str, integration_type="single"):
     """Convert function string to callable Python function"""
     from sympy import symbols, sympify, lambdify, sin, cos, tan, exp, log, sqrt, pi, E
@@ -28,9 +26,6 @@ def string_to_function(function_str, integration_type="single"):
         
         # Convert to numerical function
         func = lambdify(variables, expr, 'numpy')
-        
         return func
-        
     except Exception as e:
         raise ValueError(f"Could not convert function string: {str(e)}")
-    
