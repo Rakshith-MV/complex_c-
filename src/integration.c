@@ -97,7 +97,6 @@ EXPORT output* gaussian(double (*func)(double), double a, double b){
     return out;
 }      
 
-
 // ============================================================================================
 EXPORT output* trapezoidal2d(double* x, double* y, double (*func)(double, double), int xlength, int ylength){
     output* out = malloc(sizeof(output));
