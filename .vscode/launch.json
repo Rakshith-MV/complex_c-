@@ -8,8 +8,8 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": true,
-      "cwd": "c:/work/numerical_python/numerical/src",
-      "program": "c:/work/numerical_python/numerical/src/build/Debug/outDebug",
+      "cwd": "c:/work/numerical_python/src",
+      "program": "c:/work/numerical_python/src/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [

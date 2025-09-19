@@ -1,14 +1,14 @@
 #include<math.h>
 #include<stdlib.h>
-// #include<stdio.h>
 
 #ifndef ANDROID
     #define EXPORT __attribute__((visibility("default")))
 #endif
 
-// double RungeKutta(double*, double (*)(double, double), int, double);
-// double func(double, double);
+double* RungeKutta(double (*)(double, double), double, double, double, double);
+double func(double, double);
 double* euler_first(double (*)(double, double), double, double, double, double);
+
 
 typedef struct {
     double* values;
@@ -47,7 +47,8 @@ the ivp y'(t) = f(t,y), y(t0) = y0 has a unique solution on [a,b].
     return result;
 }
 
-EXPORT double* RungeKutta(double (*func)(double, double), double x0, double xn, double y0 , double h){
+
+double* RungeKutta(double (*func)(double, double), double x0, double xn, double y0 , double h){
     int length = (int)((xn - x0) / h) + 1;
     double* y = (double*)malloc(length * sizeof(double));
     y[0] = y0; // initial condition
@@ -60,18 +61,7 @@ EXPORT double* RungeKutta(double (*func)(double, double), double x0, double xn, 
         y[i] = y[i-1] + (k1 + 2*k2 + 2*k3 + k4) / 6;
         x += h;
     }
+
     return y;
 
 }
-
-
-// double func(double x, double y){
-//     return y - x*x + 1;
-// }
-
-
-// int main(){
-//     double* result = RungeKutta(func, 0.0, 2.0, 0.5, 0.2);
-//     free(result);
-//     return 0;
-// }
