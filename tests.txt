@@ -1,6 +1,7 @@
-Good,
+Things to be done....
 
-Lagrange, Hermitian
 
-Double: Trapezoidal, simpson
-simpson 38th is soo wrong
+Cubic spline.
+Romberg. 
+Gaussian for double integrals.
+Picards method and 2nd order ode's.
