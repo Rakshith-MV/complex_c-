@@ -86,6 +86,7 @@ def trapezoidal1d_integrate(x0, xn, h, f):
     result = lib.trapezoidal1d(x_array, f_func, length).contents
     result_trapezoidal = result.convert(length)
     lib.mfree(result)
+    result_trapezoidal['x'] = [x0+i*h for i in range(length)]
     return result_trapezoidal
 
 def simpsons1d_integrate(x0, xn, h, f):

@@ -2,7 +2,7 @@ import ctypes
 import numpy as np
 from interpolation import hermitian
 from matplotlib import pyplot as plt
-from scipy.integrate import solve_ivp
+from nintegration import gaussian
 
 lib = ctypes.CDLL('./src/node.so')
 
@@ -12,22 +12,23 @@ lib.RungeKutta.restype = ctypes.POINTER(ctypes.c_double)
 lib.euler_first.argtypes = [ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double, ctypes.c_double), ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
 lib.euler_first.restype = ctypes.POINTER(ctypes.c_double)
 
+lib.RungeKutta2.argtypes = [ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double), ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
+lib.RungeKutta2.restype = ctypes.POINTER(ctypes.c_double)
+
+
 SFUNC_TYPE = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double, ctypes.c_double)
+DFUNC_TYPE = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double)
+
 
 #Why is there an error in addition
 #The error in addition is likely due to the way the y values are being calculated and stored.
 #In the actual_solver function, the y values are being calculated using solve_ivp, which returns a different structure than expected.
 #We need to extract the y values correctly from the result of solve_ivp.
 
-def actual_solver(func, x0, xn, y0, h):
-    y = [y0]
-    x = np.linspace(x0, xn, 100)
-    sol = solve_ivp(func, (x0, xn), [y0], t_eval=x)
-    return sol.t, sol.y[0]
-
 
 #functions start here.......
 #-------------------------------------------------------------------------------
+
 def runge_kutta(func, x0, xn, y0, h):
     c_func = SFUNC_TYPE(func)
     result_ptr = lib.RungeKutta(c_func, x0, xn, y0, h)
@@ -36,6 +37,19 @@ def runge_kutta(func, x0, xn, y0, h):
     # Free the allocated memory in C
     lib.mfree(result_ptr)
     return [x0+i*h for i in range(length)] , result
+
+
+def runge_kutta2(g, x0, xn , y0, dy0, h):
+    """
+    Put in just the g(x,y,z), as f(x,y,z) is just z
+    """
+    g_func = DFUNC_TYPE(g)
+
+    result_ptr = lib.RungeKutta2(g_func, x0, xn, y0, dy0, h)
+    length = int((xn - x0) / h) + 1
+    result = [result_ptr[i] for i in range(2*length)]
+    lib.mfree(result_ptr)
+    return [x0+i*h for i in range(length)], result[:length], result[length:] 
 
 def euler_first(func, x0, xn, y0, h):
     c_func = SFUNC_TYPE(func)
@@ -64,24 +78,8 @@ def milne(func, x0, xn, y0, h):
 
 #testing
 if __name__ == "__main__":
-    def func(x, y):
-        return 1+y**2  #y - x**2 + 1
-
-    x0 = 0
-    xn = 1
-    y0 = 0
-    h = 0.2
-
-    x_val, y_val1 = runge_kutta(func, x0, xn, y0, h)
-    x_val, y_val2 = adams_bashforth(func, x0, xn, y0, h)
-    x_val, y_val3 = milne(func, x0, xn, y0, h)
-    x,y = actual_solver(func, x0, xn, y0, h)
-
-    plt.plot(x_val, y_val1, label='RK', color='blue')
-    plt.plot(x_val, y_val2, label='ab', color='red')
-    plt.plot(x_val, y_val3, label='mt', color='orange')
-
-    plt.plot(x,y, label="Actual Solver", color='green')
-    plt.legend()
-
-    plt.show()
+    def func(x, y, z):
+        return x*z - y
+    def f(x,y,z):
+        return 6*y - z
+    x, y, z = runge_kutta2(f, 0, 0.2, 3, 1, 0.1)
