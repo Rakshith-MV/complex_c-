@@ -1005,7 +1005,6 @@ class Application:
         else:
             if self.integration_method.get() == "trapezoidal":
                 ...
-
             elif self.integration_method.get() == "simpsons":
                 ...
             elif self.integration_method.get() == "simpsons38":
