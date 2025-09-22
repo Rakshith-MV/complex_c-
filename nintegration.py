@@ -78,7 +78,6 @@ lib.gaussian.restype = ctypes.POINTER(Output)
 lib.mfree.argtypes = [ctypes.POINTER(Output)]
 lib.mfree.restype = None
 
-
 def trapezoidal1d_integrate(x0, xn, h, f):
     length = int((xn-x0)/h)+1
     x_array = (ctypes.c_double * (length))(*[x0+i*h for i in range(length)])

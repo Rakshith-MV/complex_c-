@@ -95,7 +95,7 @@ class Application:
 
         # Integration variables
         self.integration_type = tk.StringVar(value="single")
-        self.integration_method = tk.StringVar(value="simpsons") 
+        self.integration_method = tk.StringVar(value="trapezoidal") 
         self.integration_results = None
 
         # ODE variables   Default variables
@@ -980,14 +980,26 @@ class Application:
         """
         plot the intermediate trianlges
         """
-        if self.integration_method == "trapezoidal":
+        if self.integration_method.get() == "trapezoidal":
             for i in range(len(x)-1):
-                x_fill = np.linspace(x[i],x[i+1],100)
                 val = (y[i+1]+y[i])/2
-                y_fill = [val for _ in x_fill]
-                self.integration_ax.fill_between(x_fill, y_fill, color='pink', alpha=0.5)
+                xt = np.linspace(x[i], x[i+1],25)
+                yt = [val for _ in xt]
+                self.integration_ax.fill_between(xt,yt,color="lightblue")
+        elif self.integration_method.get() == "simpsons":
+            for i in np.arange(1,len(x)-1):
+                val = (y[i+1]+4*y[i]+y[i+1])/6
+                xt = np.linspace(x[i-1],x[i+1],25)
+                yt = [val for _ in xt]
+                self.integration_ax.fill_between(xt,yt,color="lightblue",alpha=0.5)
+        elif self.integration_method.get() == "simpsons38":
+            for i in np.arange(2,len(x)-2):
+                val = (y[i-2]+3*y[i-1]+3*y[i+1]+y[i+2])/8
+                xt = np.linspace(x[i-2],x[i+2],25)
+                yt = [val for _ in xt]
+                self.integration_ax.fill_between(xt,yt,color="lightblue",alpha=0.5)
         else:
-            None
+            ...
 
     def clear_integration(self):
         """Clear all integration inputs and results"""
@@ -1036,7 +1048,7 @@ class Application:
                         return
 
                     h = float(sympify(self.h_single_entry.get(), locals={'pi': pi, 'e': E})) if self.h_single_entry.get() else None
-
+                    n = int((xn-x0)/h)
                     results_text = f"Single Integration - {self.integration_method.get().replace('_', ' ').title()}\n"
                     results_text += f"Function: f(x) = {function_str}\n"
                     results_text += f"Limits: x₀ = {x0}, xN = {xn}\n"    
@@ -1104,28 +1116,19 @@ class Application:
 
                     # Plotting for single integral
                     self.integration_ax.clear()
-                    if 'x_values' in integral_data and 'y_values' in integral_data:
-                        self.integration_ax.plot(integral_data['x_values'], integral_data['y_values'], 'b-o', label=f'f(x) and points ({self.integration_method.get().title()})')
-                        # Plot filled area under the curve if points are dense enough
-                        if len(integral_data['x_values']) > 1:
-                            x_fill = np.linspace(min(integral_data['x_values']), max(integral_data['x_values']), 100)
-                            y_fill = [f(val) for val in x_fill]
-                            self.integration_ax.fill_between(x_fill, y_fill, color='lightblue', alpha=0.5, label='Area under curve')
-                        x = np.arange(x0, xn+(h/2), h)
-                        self.integration_plot(x, integral_data['data'])
+                    if integral_data['data']:
+                        x_vals = [x0+i*h for i in range(n+1)]
+                        x_plot = np.linspace(x0,xn,100)
+                        self.integration_ax.plot(x_plot,f(x_plot),'b-',label="Function")
+                        self.integration_plot(x_vals,integral_data['data'])
                     else:
                         # If a method like Gaussian doesn't provide explicit x/y values, just try to plot the function
                         x_plot = np.linspace(x0, xn, 100)
                         y_plot = [f(val) for val in x_plot]
                         self.integration_ax.plot(x_plot, y_plot, 'b-', label='Function f(x)')
                         self.integration_ax.fill_between(x_plot, y_plot, color='lightblue', alpha=0.5, label='Area under curve')
-                        
-                        x = np.arange(x0, xn+(h/2), h)
-                        self.integration_plot(x, integral_data['data'])
                     
                     
-                    x = np.arange(x0, xn+(h/2), h)
-                    self.integration_plot(x, integral_data['data'])
 
                     self.integration_ax.set_xlabel('x')
                     self.integration_ax.set_ylabel('f(x)')

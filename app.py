@@ -48,6 +48,43 @@ class Application:
         self.root.title("Numerical methods")
         self.root.geometry("1400x900")
         
+        # Dictionary for info texts
+        self.info_texts = {
+            "Interpolation": (
+                "Interpolation Tab Information:\n\n"
+                "1. Lagrange: Standard polynomial interpolation for a set of points.\n"
+                "2. Hermitian: An extension of Lagrange that also uses derivative values at each point for higher accuracy.\n"
+                "3. Cubic Spline: Creates a series of piecewise cubic polynomials that pass through the points, ensuring smoothness.\n\n"
+                "Input Format: Use comma-separated values for points (e.g., 1, 2, 3.5). "
+                "Mathematical expressions like 'pi/2', 'e^2', 'sin(1)' are supported.\n"
+                "Cubic spline hasn't been implemented yet!!"
+            ),
+            "Numerical Integration": (
+                "Numerical Integration Tab Information:\n\n"
+                "Methods:\n"
+                "- Trapezoidal/Simpson's 1/3 & 3/8: Classic rules for approximating definite integrals.\n"
+                "- Gaussian Quadrature: A highly accurate method that uses specific points and weights. 'h' is not required.\n"
+                "- Romberg: (Under development) Uses Richardson extrapolation to improve Trapezoidal rule results.\n\n"
+                "Types:\n"
+                "- Single Integral: ∫f(x)dx\n"
+                "- Double Integral: ∫∫f(x,y)dxdy. The plot will show a 3D surface.\n\n"
+                "Function Input: Use 'x' for single integrals and 'x', 'y' for double integrals. "
+                "Supports standard math functions like 'sin(x)', 'exp(y)', 'sqrt(x*y)'.\n"
+            ),
+            "Ordinary Differential Equations": (
+                "ODE Tab Information:\n\n"
+                "This tab solves initial value problems for first and second-order ODEs.\n\n"
+                "Methods (First Order y' = f(x,y)):\n"
+                "- Runge-Kutta: A popular and robust family of methods (this app uses RK4).\n"
+                "- Adams-Bashforth: A multi-step method, often efficient but requires starting values.\n"
+                "- Milne: A predictor-corrector multi-step method.\n"
+                "- Picard: (Not implemented) An iterative method for finding successive approximations.\n\n"
+                "Methods (Second Order y'' = f(x,y,y')):\n"
+                "- Only Runge-Kutta is currently implemented.\n\n"
+                "Analytical Solution: You can enter the exact solution y(x) to compare it with the numerical results on the plot."
+            )
+        }
+        
         # Interpolation Variables
         self.points = []
         self.derivatives = []  # For Hermitian interpolation
@@ -59,7 +96,7 @@ class Application:
 
         # Integration variables
         self.integration_type = tk.StringVar(value="single")
-        self.integration_method = tk.StringVar(value="simpsons") 
+        self.integration_method = tk.StringVar(value="trapezoidal") 
         self.integration_results = None
 
         # ODE variables   Default variables
@@ -71,7 +108,31 @@ class Application:
         self.ode_numerical_results = {} # To store numerical results for replotting
 
         self.setup_gui()
+
+        # Create and place the button AFTER the main GUI is packed.
+        info_button = ttk.Button(self.root, text="ⓘ", command=self.show_info, width=3)
+        info_button.place(relx=1.0, rely=0, x=-5, y=5, anchor='ne')
         
+        # **FIX**: Force the button to the top of the stacking order to ensure it's visible.
+        info_button.lift()
+        
+    def show_info(self):
+        """Displays information about the current tab."""
+        try:
+            # Get the text/title of the currently selected tab
+            selected_tab_title = self.main_notebook.tab(self.main_notebook.select(), "text")
+            
+            # Retrieve the corresponding info text from the dictionary
+            info_message = self.info_texts.get(selected_tab_title, "No information available for this tab.")
+            
+            # Show the info message box
+            messagebox.showinfo(f"Information: {selected_tab_title}", info_message)
+        except tk.TclError:
+            # This can happen if no tab is selected, though unlikely in a running app.
+            messagebox.showwarning("Info", "Could not determine the current tab.")
+        except Exception as e:
+            messagebox.showerror("Error", f"An unexpected error occurred: {e}")
+
     def setup_gui(self):
         # Create main notebook for tabs
         self.main_notebook = ttk.Notebook(self.root)
@@ -914,6 +975,43 @@ class Application:
             self.single_frame.grid_remove()
             self.double_frame.grid()
     
+    def integration_plot(self,
+                         x,
+                         y):
+        """
+        plot the intermediate trianlges
+        """
+        if self.integration_type == "single":
+            if self.integration_method.get() == "trapezoidal":
+                for i in range(len(x)-1):
+                    val = (y[i+1]+y[i])/2
+                    xt = np.linspace(x[i], x[i+1],25)
+                    yt = [val for _ in xt]
+                    self.integration_ax.fill_between(xt,yt,color="lightblue")
+            elif self.integration_method.get() == "simpsons":
+                for i in np.arange(1,len(x)-1):
+                    val = (y[i+1]+4*y[i]+y[i+1])/6
+                    xt = np.linspace(x[i-1],x[i+1],25)
+                    yt = [val for _ in xt]
+                    self.integration_ax.fill_between(xt,yt,color="lightblue",alpha=0.5)
+            elif self.integration_method.get() == "simpsons38":
+                for i in np.arange(2,len(x)-2):
+                    val = (y[i-2]+3*y[i-1]+3*y[i+1]+y[i+2])/8
+                    xt = np.linspace(x[i-2],x[i+2],25)
+                    yt = [val for _ in xt]
+                    self.integration_ax.fill_between(xt,yt,color="lightblue",alpha=0.5)
+            else:
+                ...
+        else:
+            if self.integration_method.get() == "trapezoidal":
+                ...
+
+            elif self.integration_method.get() == "simpsons":
+                ...
+            elif self.integration_method.get() == "simpsons38":
+                ...
+
+
     def clear_integration(self):
         """Clear all integration inputs and results"""
         # Clear input fields
@@ -961,7 +1059,7 @@ class Application:
                         return
 
                     h = float(sympify(self.h_single_entry.get(), locals={'pi': pi, 'e': E})) if self.h_single_entry.get() else None
-
+                    n = int((xn-x0)/h)
                     results_text = f"Single Integration - {self.integration_method.get().replace('_', ' ').title()}\n"
                     results_text += f"Function: f(x) = {function_str}\n"
                     results_text += f"Limits: x₀ = {x0}, xN = {xn}\n"    
@@ -1016,12 +1114,11 @@ class Application:
                     # Array output for single integral (if available)
                     array_text = "Function values (y-values at integration points):\n"
                     if 'data' in integral_data and integral_data['data']:
+                        temp = x0
+                        array_text += f"{'i':>3} {'x':>6} {'y':>12}\n"
+                        array_text += "-" * 25 + "\n"
                         for i, val in enumerate(integral_data['data']):
-                            array_text += f"{val:.4f} "
-                            if (i + 1) % 5 == 0:  # Newline every 5 values for readability
-                                array_text += "\n"
-                        if (i + 1) % 5 != 0:
-                            array_text += "\n"
+                            array_text += f"{i:3} {temp+i*h:7.4f} {val:12.6f}\n"
                     else:
                         array_text += "No detailed array output for this method or configuration.\n"
 
@@ -1030,19 +1127,19 @@ class Application:
 
                     # Plotting for single integral
                     self.integration_ax.clear()
-                    if 'x_values' in integral_data and 'y_values' in integral_data:
-                        self.integration_ax.plot(integral_data['x_values'], integral_data['y_values'], 'b-o', label=f'f(x) and points ({self.integration_method.get().title()})')
-                        # Plot filled area under the curve if points are dense enough
-                        if len(integral_data['x_values']) > 1:
-                            x_fill = np.linspace(min(integral_data['x_values']), max(integral_data['x_values']), 100)
-                            y_fill = [f(val) for val in x_fill]
-                            self.integration_ax.fill_between(x_fill, y_fill, color='lightblue', alpha=0.2, label='Area under curve')
+                    if integral_data['data']:
+                        x_vals = [x0+i*h for i in range(n+1)]
+                        x_plot = np.linspace(x0,xn,100)
+                        self.integration_ax.plot(x_plot,f(x_plot),'b-',label="Function")
+                        self.integration_plot(x_vals,integral_data['data'])
                     else:
                         # If a method like Gaussian doesn't provide explicit x/y values, just try to plot the function
                         x_plot = np.linspace(x0, xn, 100)
                         y_plot = [f(val) for val in x_plot]
                         self.integration_ax.plot(x_plot, y_plot, 'b-', label='Function f(x)')
                         self.integration_ax.fill_between(x_plot, y_plot, color='lightblue', alpha=0.5, label='Area under curve')
+                    
+                    
 
                     self.integration_ax.set_xlabel('x')
                     self.integration_ax.set_ylabel('f(x)')
