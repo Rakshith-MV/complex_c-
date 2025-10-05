@@ -10,12 +10,13 @@
 double trap(double*, int, int);
 double multiply(double*, double*, int);
 double simp(double*, int, int);
-// double function(double, double);
+// double function( double);
 double roundn(double , int );
 
 
 typedef struct {
     double* values;
+    double* graph;
     double integral;
 } output;
 
@@ -23,6 +24,7 @@ typedef struct {
 EXPORT void mfree(output* out){
     if(out){
         free(out->values);
+        free(out->graph);
         free(out);
     }
 }
@@ -30,14 +32,20 @@ EXPORT void mfree(output* out){
 EXPORT output* trapezoidal1d(double* x, double (*func)(double), int length){
     output* out = malloc(sizeof(output));
     double *values = malloc(length * sizeof(double));
+    double *graph = malloc(length * sizeof(double));
     double sum = 0.0;
     for (int i = 0; i < length; i++) {
-        values[i] = roundn(func(x[i]), 5);
+        values[i] = func(x[i]);
         sum = sum + 2*values[i];   
     }
+    for(int i = 1; i < length; i++){
+        graph[i] = (values[i] + values[i-1])/2;
+    }
+    graph[0] = length - 1;
     sum = sum - (values[0] + values[length-1]);
     sum = sum * (x[1] - x[0]) / 2;
     out->values = values;
+    out->graph = graph;
     out->integral = sum;
     return out;
 }
@@ -45,23 +53,31 @@ EXPORT output* trapezoidal1d(double* x, double (*func)(double), int length){
 EXPORT output* simpsons1d(double* x, double (*func)(double), int length){
     output* out = malloc(sizeof(output));
     double *values = malloc(length * sizeof(double));
-    int i = 1;
+    double *graph = malloc(length * sizeof(double));
     double sum = 0.0;
+    int i = 1;
     while(i < length-1){
         if(i % 2 == 0){
-            values[i] = roundn(func(x[i]),5);
+            values[i] = func(x[i]);
             sum += 2*values[i];
         }
         else{
-            values[i] = roundn(func(x[i]),5);
+            values[i] = func(x[i]);
             sum += 4*values[i];
         }
         i++;
     }
-    values[0] = roundn(func(x[0]),5);
-    values[length-1] = roundn(func(x[length-1]),5);
+
+    values[0] = func(x[0]);
+    values[length-1] = func(x[length-1]);
     sum += values[0] + values[length-1];
     sum *= (x[1] - x[0]) / 3;
+    i = 1;
+    for(int j = 0; j < length-2; j+=2, i++){
+        graph[i] = (values[j] + 4*values[j+1] + values[j+2])/6;
+    }
+    graph[0] = i-1;
+    out->graph = graph;
     out->values = values;
     out->integral =  sum;
     return out;
@@ -70,6 +86,7 @@ EXPORT output* simpsons1d(double* x, double (*func)(double), int length){
 EXPORT output* simpsons381d(double* x, double (*func)(double), int length){
     output *out = malloc(sizeof(output));
     double *values = malloc(length* sizeof(double));
+    double *graph = malloc(length * sizeof(double));
     int j = 0;
     double sum = 0;
     for(int i = 0; i<length; i++){
@@ -79,7 +96,13 @@ EXPORT output* simpsons381d(double* x, double (*func)(double), int length){
         sum  += values[j] + 3*values[j+1] + 3*values[j+2] + values[j+3];
         j = j+3;
     }
+    j = 1;
+    for(int i = 0; i < length-3; i+=3, j++){
+        graph[j] = (values[i] + 3*values[i+1] + 3*values[i+2] + values[i+3])/8;
+    }
+    graph[0] = j-1;
     out->values = values;
+    out->graph = graph;
     out->integral = 3*(x[1]-x[0])*sum/8;
     return out;
 }
@@ -119,8 +142,7 @@ EXPORT output* simpsons2d(double* x, double* y, double (*func)(double, double), 
         for (int j = 0; j < ylength; j++) {
             values[i * ylength + j] = roundn(func(x[i], y[j]), 5);
         }
-    }
-    
+    }    
     double simpsons =  simp(values, xlength, ylength);
     out->values = values;
     out->integral = (x[1]-x[0])*(y[1]-y[0])*simpsons/9;
@@ -191,18 +213,23 @@ double roundn(double num, int n) {
     return rounded_shifted_num / pow(10, n);
 }
 
-
-// double function(double x, double y){
-//     return 1/(x*x + y*y);
+// double function(double x){
+//     return exp(x)/x;
 // }
 
 // int main(){
-//     double x[3] = {1,1.5,2};
-//     double y[3] = {1,1.5,2};
-//     output *k = simpsons2d(x, y, function, 3, 3);
+//     double x[30];
+//     for(int i = 0; i <= 29; i++){
+//         x[i] = 1 + i/29.0;
+//     }
+//     output *k = trapezoidal1d(x, function, 30);
 //     printf("Simpsons 1D Integration Result: %f\n", k->integral);
-//     for(int i = 0; i < 9; i++){
-//         printf("%f ", k->values[i]);
+//     for(int i = 0; i < 30; i++){
+//         printf("f(%f) = %f, %f\n", x[i], k->values[i]);
+//         // printf("f(%f) = %f\n", x[i], k->graph[i]);
+//     }
+//     for(int i = 0; i < k->graph[0]; i++){
+//         printf("Graph %d: %f\n", i, k->graph[i]);
 //     }
 //     mfree(k);
 // }

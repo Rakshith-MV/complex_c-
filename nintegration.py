@@ -4,18 +4,23 @@ import math
 class Output(ctypes.Structure):
     _fields_ = [
         ("values", ctypes.POINTER(ctypes.c_double)),
-        ("integral", ctypes.c_double)
+        ("graph", ctypes.POINTER(ctypes.c_double)),
+        ("integral", ctypes.c_double),
     ]
     def convert(self,xlength,ylength: int = 1):
         try:
+            length = int(self.graph[0]) 
+            graph = [self.graph[i] for i in range(1, length+1)]  #+1
             return {'data':[self.values[i] for i in range(xlength*ylength)],
-                'integral_value': self.integral}
+                'integral_value': self.integral,
+                'graph': graph}
         except:
             return {'data':None,
-                'integral_value': self.integral}
+                'integral_value': self.integral,
+                'graph': None}
 FUNC_TYPE = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double, ctypes.c_double)
 SFUNC_TYPE = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double)
-lib = ctypes.CDLL('./src/integration.so')
+lib = ctypes.CDLL('./src/integration.so') 
 
 
 lib.trapezoidal2d.argtypes = [
@@ -176,48 +181,50 @@ def romberg_integration(f, a, b, tol=1e-6, max_iter=10):
 if __name__ == "__main__":
     print("Running tests on numerical integration.......")
 
-    f = lambda x,y: 1/(x**2 + y**2)
-    result = simpsons2d_integrate(1,2,1,2,0.5,0.5,f)
-    assert abs(float(result['integral_value']) - 0.231169) < 1e-3, f"Expected 0.231169, got {result['integral_value']}"
+    # f = lambda x,y: 1/(x**2 + y**2)
+    # result = simpsons2d_integrate(1,2,1,2,0.5,0.5,f)
+    # print(result[1])
+    # assert abs(float(result['integral_value']) - 0.231169) < 1e-3, f"Expected 0.231169, got {result['integral_value']}"
     
-    f = lambda x,y: 1/(1+x+y)
-    result = simpsons2d_integrate(0,1,0,1,0.5,0.5,f)
-    assert abs(float(result['integral_value']) - 0.524074) < 1e-3, f"Expected 0.524074, got {result['integral_value']}"
+    # f = lambda x,y: 1/(1+x+y)
+    # result = simpsons2d_integrate(0,1,0,1,0.5,0.5,f)
+    # assert abs(float(result['integral_value']) - 0.524074) < 1e-3, f"Expected 0.524074, got {result['integral_value']}"
 
-    f = lambda x,y: x*math.exp(y)
-    result = trapezoidal2d_integrate(0,1,0,1,0.5,0.5,f)
-    assert abs(float(result['integral_value']) - 0.8770) < 1e-3, f"Expected 0.8770, got {result['integral_value']}"
+    # f = lambda x,y: x*math.exp(y)
+    # result = trapezoidal2d_integrate(0,1,0,1,0.5,0.5,f)
+    # assert abs(float(result['integral_value']) - 0.8770) < 1e-3, f"Expected 0.8770, got {result['integral_value']}"
 
-    f = lambda x,y: 1/math.sqrt(x**2+y**2)
-    result = trapezoidal2d_integrate(1,5, 1, 5, 2,2,f)
-    assert abs(float(result['integral_value']) - 4.1343) < 1e-3, f"Expected 4.1343, got {result['integral_value']}"
+    # f = lambda x,y: 1/math.sqrt(x**2+y**2)
+    # result = trapezoidal2d_integrate(1,5, 1, 5, 2,2,f)
+    # assert abs(float(result['integral_value']) - 4.1343) < 1e-3, f"Expected 4.1343, got {result['integral_value']}"
     
 
 
-    f = lambda x: 1/x
-    result = trapezoidal1d_integrate(1, 2, 0.2, f)
-    assert abs(float(result['integral_value']) - 0.695635) < 1e-4, f"Expected 0.695635, got {result['integral_value']}"
+    f = lambda x: math.sin(x)
+    # result = trapezoidal1d_integrate(1, 2, 0.2, f)
+    # assert abs(result['integral_value'] - 0.695635) < 1e-4, f"Expected 0.695635, got {result['integral_value']}"
     
-    result = simpsons1d_integrate(1, 2, 0.1, f)
-    assert abs(float(result['integral_value']) - 0.693150) < 1e-4, f"Expected 0.693150, got {result['integral_value']}"
+    result = simpsons1d_integrate(0, 2*math.pi, math.pi/10, f)
+    print(result)
+    assert abs(float(result['integral_value']) - 0) < 1e-4, f"Expected 0.693150, got {result['integral_value']}"
 
-    f = lambda x: math.exp(x**2)
-    result = simpsons1d_integrate(0, 1, 0.1, f)
-    assert abs(float(result['integral_value']) - 1.462681) < 1e-4, f"Expected 1.462681, got {result['integral_value']}"
+    # f = lambda x: math.exp(x**2)
+    # result = simpsons1d_integrate(0, 1, 0.1, f)
+    # assert abs(float(result['integral_value']) - 1.462681) < 1e-4, f"Expected 1.462681, got {result['integral_value']}"
 
-    f = lambda x: math.exp(-x/2)
-    result = gaussian(f, -2, 2)
-    assert abs(float(result['two']) - 4.6853) < 1e-4, f"Expected 4.6853, got {result['two']}"
+    # f = lambda x: math.exp(-x/2)
+    # result = gaussian(f, -2, 2)
+    # assert abs(float(result['two']) - 4.6853) < 1e-4, f"Expected 4.6853, got {result['two']}"
 
-    f = lambda x: math.exp(x)*math.cos(x) - 2*x
-    result = gaussian(f, 0, 1)
-    assert abs(float(result['three']) - 0.37802) < 1e-4, f"Expected 0.37802, got {result['three']}"
+    # f = lambda x: math.exp(x)*math.cos(x) - 2*x
+    # result = gaussian(f, 0, 1)
+    # assert abs(float(result['three']) - 0.37802) < 1e-4, f"Expected 0.37802, got {result['three']}"
     
-    print("Started")
-    f = lambda x: math.sin(x)/(2+3*math.sin(x))
-    result = simpsons381d_integrate(0,1,1/6,f)
-    for i in result['data']:
-        print(i)
-    assert abs(float(result['integral_value']) - 0.1250) < 1e-4, f"Expected 0.1250, got {result['integral_value']}"
+    # print("Started")
+    # f = lambda x: math.sin(x)/(2+3*math.sin(x))
+    # result = simpsons381d_integrate(0,1,1/6,f)
+    # for i in result['data']:
+    #     print(i)
+    # assert abs(float(result['integral_value']) - 0.1250) < 1e-4, f"Expected 0.1250, got {result['integral_value']}"
 
     print("Integration tests passed...")

@@ -47,7 +47,7 @@ class Application:
         self.root = root
         self.root.title("Numerical methods")
         self.root.geometry("1400x900")
-        
+
         # Dictionary for info texts
         self.info_texts = {
             "Interpolation": (
@@ -57,7 +57,7 @@ class Application:
                 "3. Cubic Spline: Creates a series of piecewise cubic polynomials that pass through the points, ensuring smoothness.\n\n"
                 "Input Format: Use comma-separated values for points (e.g., 1, 2, 3.5). "
                 "Mathematical expressions like 'pi/2', 'e^2', 'sin(1)' are supported.\n"
-                "Cubic spline hasn't been implemented yet!!"
+                "\nFOR SRC CODE : https://github.com/Rakshith-MV/complex_c-/tree/master#"
             ),
             "Numerical Integration": (
                 "Numerical Integration Tab Information:\n\n"
@@ -70,6 +70,8 @@ class Application:
                 "- Double Integral: ∫∫f(x,y)dxdy. The plot will show a 3D surface.\n\n"
                 "Function Input: Use 'x' for single integrals and 'x', 'y' for double integrals. "
                 "Supports standard math functions like 'sin(x)', 'exp(y)', 'sqrt(x*y)'.\n"
+                "\nFOR SRC CODE : https://github.com/Rakshith-MV/complex_c-/tree/master#"
+
             ),
             "Ordinary Differential Equations": (
                 "ODE Tab Information:\n\n"
@@ -81,7 +83,9 @@ class Application:
                 "- Picard: (Not implemented) An iterative method for finding successive approximations.\n\n"
                 "Methods (Second Order y'' = f(x,y,y')):\n"
                 "- Only Runge-Kutta is currently implemented.\n\n"
-                "Analytical Solution: You can enter the exact solution y(x) to compare it with the numerical results on the plot."
+                "Analytical Solution: You can enter the exact solution y(x) to compare it with the numerical results on the plot\n."
+                "\nFOR SRC CODE : https://github.com/Rakshith-MV/complex_c-/tree/master#"
+
             )
         }
         
@@ -981,35 +985,23 @@ class Application:
         """
         plot the intermediate trianlges
         """
-        if self.integration_type == "single":
-            if self.integration_method.get() == "trapezoidal":
-                for i in range(len(x)-1):
-                    val = (y[i+1]+y[i])/2
-                    xt = np.linspace(x[i], x[i+1],25)
-                    yt = [val for _ in xt]
-                    self.integration_ax.fill_between(xt,yt,color="lightblue")
-            elif self.integration_method.get() == "simpsons":
-                for i in np.arange(1,len(x)-1):
-                    val = (y[i+1]+4*y[i]+y[i+1])/6
-                    xt = np.linspace(x[i-1],x[i+1],25)
-                    yt = [val for _ in xt]
-                    self.integration_ax.fill_between(xt,yt,color="lightblue",alpha=0.5)
-            elif self.integration_method.get() == "simpsons38":
-                for i in np.arange(2,len(x)-2):
-                    val = (y[i-2]+3*y[i-1]+3*y[i+1]+y[i+2])/8
-                    xt = np.linspace(x[i-2],x[i+2],25)
-                    yt = [val for _ in xt]
-                    self.integration_ax.fill_between(xt,yt,color="lightblue",alpha=0.5)
-            else:
-                ...
+        if self.integration_method.get() == "trapezoidal":
+            for i in range(len(x)-1):
+                xt = np.linspace(x[i], x[i+1],25)
+                yt = [y[i] for _ in xt]
+                self.integration_ax.fill_between(xt,yt,color="lightblue",alpha=0.5)
+        elif self.integration_method.get() == "simpsons":
+            for i,j in enumerate(y):
+                xt = np.linspace(x[2*i],x[2*i+2],25)
+                yt = [j for _ in xt]
+                self.integration_ax.fill_between(xt,yt,color="lightblue",alpha=0.5)
+        elif self.integration_method.get() == "simpsons38":
+            for i,j in enumerate(y):
+                xt = np.linspace(x[3*i],x[3*(i+1)],25)
+                yt = [j for _ in xt]
+                self.integration_ax.fill_between(xt,yt,color="lightblue",alpha=0.5)
         else:
-            if self.integration_method.get() == "trapezoidal":
-                ...
-            elif self.integration_method.get() == "simpsons":
-                ...
-            elif self.integration_method.get() == "simpsons38":
-                ...
-
+            ...
 
     def clear_integration(self):
         """Clear all integration inputs and results"""
@@ -1130,16 +1122,13 @@ class Application:
                         x_vals = [x0+i*h for i in range(n+1)]
                         x_plot = np.linspace(x0,xn,100)
                         self.integration_ax.plot(x_plot,f(x_plot),'b-',label="Function")
-                        self.integration_plot(x_vals,integral_data['data'])
+                        self.integration_plot(x_vals,integral_data['graph'])
                     else:
                         # If a method like Gaussian doesn't provide explicit x/y values, just try to plot the function
                         x_plot = np.linspace(x0, xn, 100)
                         y_plot = [f(val) for val in x_plot]
                         self.integration_ax.plot(x_plot, y_plot, 'b-', label='Function f(x)')
                         self.integration_ax.fill_between(x_plot, y_plot, color='lightblue', alpha=0.5, label='Area under curve')
-                    
-                    
-
                     self.integration_ax.set_xlabel('x')
                     self.integration_ax.set_ylabel('f(x)')
                     self.integration_ax.set_title(f'Single Integral: {self.integration_method.get().replace("_", " ").title()} Method')
@@ -1216,6 +1205,15 @@ class Application:
                     self.integration_ax.clear()
                     self.integration_fig.clear() # Clear entire figure for 3D plot
                     self.integration_ax = self.integration_fig.add_subplot(111, projection='3d') # Add 3D subplot
+                    
+                    # if self.integration_method.get() != 'all':
+                    #     x_box = np.arange(x0, xn + h/2, h)
+                    #     y_box = np.arange(y0, yn + k/2, k)
+                    #     if self.integration_method.get() == 'trapezoidal':
+                            
+                    #     self.integration_ax.bar3d(X.flatten(), Y.flatten(), np.zeros_like(Z).flatten(),
+                    #                              h, k, dz.flatten(), shade=True, alpha=0.6)
+
                     self.integration_ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.8)
                     self.integration_ax.set_xlabel('x')
                     self.integration_ax.set_ylabel('y')
