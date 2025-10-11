@@ -6,3 +6,7 @@ build/
 dist/
 icon.ico
 app.spec
+temp.py
+temp.txt
+temp.ipynb
+tests.txt

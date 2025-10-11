@@ -849,9 +849,10 @@ class Application:
 
                 
             else:  # Second order
-                # messagebox.showinfo("info","Second order is under progress!!")
-                # return
-            
+                if self.ode_method.get() in ['picard', 'milne','adams_bashforth','all']:
+                    messagebox.showinfo("Info", f"{self.ode_method.get().replace('_', '-').title()} method not implemented yet for second order ODEs. Using Runge-Kutta instead.")
+                    self.ode_method.set('rk')  # Default to Runge-Kutta
+
                 # To store values
                 self.ode_numerical_results = {}
 
@@ -980,28 +981,106 @@ class Application:
             self.double_frame.grid()
     
     def integration_plot(self,
-                         x,
-                         y):
+                         f,
+                         X,
+                         Y=None):
         """
         plot the intermediate trianlges
+        x and y are lists of values, 
+        we shall build meshes and implement the barplot
+        
         """
-        if self.integration_method.get() == "trapezoidal":
-            for i in range(len(x)-1):
-                xt = np.linspace(x[i], x[i+1],25)
-                yt = [y[i] for _ in xt]
-                self.integration_ax.fill_between(xt,yt,color="lightblue",alpha=0.5)
-        elif self.integration_method.get() == "simpsons":
-            for i,j in enumerate(y):
-                xt = np.linspace(x[2*i],x[2*i+2],25)
-                yt = [j for _ in xt]
-                self.integration_ax.fill_between(xt,yt,color="lightblue",alpha=0.5)
-        elif self.integration_method.get() == "simpsons38":
-            for i,j in enumerate(y):
-                xt = np.linspace(x[3*i],x[3*(i+1)],25)
-                yt = [j for _ in xt]
-                self.integration_ax.fill_between(xt,yt,color="lightblue",alpha=0.5)
+        messagebox.showinfo("1")
+        if self.integration_type.get() == 'single':
+            if self.integration_method.get() == 'trapezoidal':
+                h = X[1] - X[0]
+                for j,i in enumerate(np.arange(X[0], X[-1],h)):
+                    points = np.linspace(i, i+h, 25)
+                    self.integration_ax.fill_between(points, 0, f[j], color='lightblue', alpha=0.5)
+            if self.integration_method.get() == 'simpsons':
+                h = X[1] - X[0]
+                for j,i in enumerate(np.arange(X[0], X[-1],2*h)):
+                    points = np.linspace(i,i+2*h,25)
+                    self.integration_ax.fill_between(points,0,f[j], color='lightblue',alpha=0.5)
+            if self.integration_method.get() == 'simpsons38':
+                h = X[1] - X[0]
+                for j,i in enumerate(np.arange(X[0],X[-1],3*h)):
+                    if i+3*h <= X[-1]:
+                        points = np.linspace(i,i+3*h, 25)
+                        self.integration_ax.fill_between(points,0,f[j],color='lightblue',alpha=0.5)
         else:
-            ...
+            if self.integration_method.get() == 'trapezoidal':
+                messagebox.showinfo("2")     
+                h = X[1]-X[0]   #probably not required to create another mesh
+                k = Y[1]-Y[0]
+                x_vals = X[:-1]
+                y_vals = Y[:-1]
+                x, y = np.meshgrid(x_vals, y_vals)
+                x_vals = x.ravel()
+                y_vals = y.ravel()
+                base = np.zeros_like(f)
+                # with open("debug.txt",'w+') as ff:
+                #     ff.write(f"x_vals: {x_vals} : {len(x_vals)}\n")
+                #     ff.write(f"y_vals: {y_vals} : {len(y_vals)}\n")
+                #     ff.write(f"f: {f}, : {len(f)}\n")
+                #     # f.write(f"base: {base} : {len(base)}\n ")
+                #     # f.write(f"h: {h}\n")
+                self.integration_ax.bar3d(x_vals, y_vals, base, h, k, f, shade=True, alpha=0.5)
+            if self.integration_method.get() == 'simpsons':
+                h = X[1]-X[0]
+                k = Y[1]-Y[0]
+                x_vals = X[:-2:2]
+                y_vals = Y[:-2:2]
+                x, y = np.meshgrid(x_vals, y_vals)
+                x_vals = x.ravel()
+                y_vals = y.ravel()
+                base = np.zeros_like(f)
+                self.integration_ax.bar3d(x_vals, y_vals, base, 2*h, 2*k, f, shade=True, alpha=0.5)
+
+            if self.integration_method.get() == 'simpsons38':
+                messagebox.showinfo("3")
+                h = X[1]-X[0]
+                k = Y[1]-Y[0]
+                
+                # Fix: Create grid points at intervals of 3*h and 3*k
+                x_vals = [X[0] + 3*i*h for i in range(int(len(X)/3))]
+                y_vals = [Y[0] + 3*j*k for j in range(int(len(Y)/3))]
+                
+                # Don't use meshgrid and ravel - create the positions directly
+                x_pos = []
+                y_pos = []
+                for y in y_vals:
+                    for x in x_vals:
+                        x_pos.append(x)
+                        y_pos.append(y)
+                
+                x_pos = np.array(x_pos)
+                y_pos = np.array(y_pos)
+                base = np.zeros_like(f)
+                
+                with open("debug.txt",'w+') as ff:
+                    ff.write(f"x_pos: {x_pos} : {len(x_pos)}\n")
+                    ff.write(f"y_pos: {y_pos} : {len(y_pos)}\n")
+                    ff.write(f"f: {f}, : {len(f)}\n")
+                    ff.write(f"base: {base} : {len(base)}\n")
+                
+                self.integration_ax.bar3d(x_pos, y_pos, base, 3*h, 3*k, f, shade=True, alpha=0.5)
+                
+                # messagebox.showinfo("3")
+                # h = X[1]-X[0]
+                # k = Y[1]-Y[0]
+                # x_vals = [X[0] + 3*i*h for i in range(int(len(X)/3))]
+                # y_vals = [Y[0] + 3*i*k for i in range(int(len(Y)/3))]
+                # x, y = np.meshgrid(x_vals, y_vals)
+                # x_vals = x.ravel()
+                # y_vals = y.ravel()
+                # base = np.zeros_like(f)
+                # with open("debug.txt",'w+') as ff:
+                #     ff.write(f"x_vals: {x_vals} : {len(x_vals)}\n")
+                #     ff.write(f"y_vals: {y_vals} : {len(y_vals)}\n")
+                #     ff.write(f"f: {f}, : {len(f)}\n")
+                #     ff.write(f"base: {base} : {len(base)}\n ")
+                # self.integration_ax.bar3d(x_vals, y_vals, base, 3*h, 3*k, f, shade=True, alpha=0.5) 
 
     def clear_integration(self):
         """Clear all integration inputs and results"""
@@ -1063,7 +1142,8 @@ class Application:
                         val = singlefunctions[self.integration_method.get()](f,x0,xn)
                         results_text += f"The integral under 2 points : {val['two']:.6f}, 3 points : {val['three']:.6f}\n"
                         integral_data['integral_value'] = f"2 points: {val['two']:.6f}, 3 points: {val['three']:.6f}" # Storing string for gaussian
-                        integral_data['data'] = [] # Gaussian doesn't provide a continuous array of points for visualising like trapezoidal
+                        integral_data['data'] = []  # Gaussian doesn't provide a continuous array of points for visualising like trapezoidal
+                        integral_data['graph'] = []
                     elif self.integration_method.get() == 'all':
                         all_results_string = ""
                         x_vals_for_plot = None
@@ -1122,7 +1202,7 @@ class Application:
                         x_vals = [x0+i*h for i in range(n+1)]
                         x_plot = np.linspace(x0,xn,100)
                         self.integration_ax.plot(x_plot,f(x_plot),'b-',label="Function")
-                        self.integration_plot(x_vals,integral_data['graph'])
+                        self.integration_plot(integral_data['graph'], x_vals)
                     else:
                         # If a method like Gaussian doesn't provide explicit x/y values, just try to plot the function
                         x_plot = np.linspace(x0, xn, 100)
@@ -1206,13 +1286,10 @@ class Application:
                     self.integration_fig.clear() # Clear entire figure for 3D plot
                     self.integration_ax = self.integration_fig.add_subplot(111, projection='3d') # Add 3D subplot
                     
-                    # if self.integration_method.get() != 'all':
-                    #     x_box = np.arange(x0, xn + h/2, h)
-                    #     y_box = np.arange(y0, yn + k/2, k)
-                    #     if self.integration_method.get() == 'trapezoidal':
-                            
-                    #     self.integration_ax.bar3d(X.flatten(), Y.flatten(), np.zeros_like(Z).flatten(),
-                    #                              h, k, dz.flatten(), shade=True, alpha=0.6)
+                    if self.integration_method.get() not in ['all', 'gaussian','romberg']:
+                        fn = integral_result['graph']
+                        messagebox.showinfo("Debug", f"Plotting with fn: {type(fn)}")
+                        self.integration_plot(fn, x_vals_plot, y_vals_plot)
 
                     self.integration_ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.8)
                     self.integration_ax.set_xlabel('x')
@@ -1245,9 +1322,9 @@ class Application:
             x_min_interp, x_max_interp = min(x_vals_interp), max(x_vals_interp)
             x_range_interp = x_max_interp - x_min_interp
             if x_range_interp > 0:
-                x_plot_interp = np.linspace(x_min_interp - 0.2*x_range_interp, x_max_interp + 0.2*x_range_interp, 500)
+                x_plot_interp = np.linspace(x_min_interp, x_max_interp, 500)
             else: # Case of a single point or all points at the same x-value
-                x_plot_interp = np.linspace(x_min_interp - 1.0, x_max_interp + 1.0, 500)
+                x_plot_interp = np.linspace(x_min_interp , x_max_interp , 500)
 
             if self.interpolation_type.get() in ["lagrange", "hermitian"]:
                 y_plot_interp = [self.current_func(i) for i in x_plot_interp]
@@ -1262,7 +1339,7 @@ class Application:
                                textcoords='offset points', fontsize=8)
         
         self.ax.grid(True, alpha=0.3)
-        self.ax.legend()
+        # self.ax.legend()
         self.ax.set_xlabel('x')
         self.ax.set_ylabel('y')
         self.ax.set_title('Interpolation Plot') # Changed title slightly

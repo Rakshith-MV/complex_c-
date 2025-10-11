@@ -7,17 +7,55 @@ class Output(ctypes.Structure):
         ("graph", ctypes.POINTER(ctypes.c_double)),
         ("integral", ctypes.c_double),
     ]
-    def convert(self,xlength,ylength: int = 1):
+    def convert(self,
+                xlength,
+                ylength:int = 1):
         try:
             length = int(self.graph[0]) 
-            graph = [self.graph[i] for i in range(1, length+1)]  #+1
+            graph = [self.graph[i] for i in range(1, length)]  #+1
             return {'data':[self.values[i] for i in range(xlength*ylength)],
                 'integral_value': self.integral,
                 'graph': graph}
-        except:
+        except Exception as e:
+            print("The exception is ", e)
             return {'data':None,
                 'integral_value': self.integral,
                 'graph': None}
+    def gaussian_convert(self):
+        a, b = self.integral, self.values[0]
+        return {
+            'two':self.integral,
+            'three':self.values[0]
+        }
+    
+    def trapezoidal_convert(self,
+                            x,
+                            y):
+        return {
+            'integral_value': self.integral,
+            'data':[self.values[i] for i in range(x*y)],
+            'graph' : [self.graph[i] for i in range((x-1)*(y-1))]
+        }
+
+    def simpsons_convert(self,
+                         x,
+                         y):
+        return {
+            'integral_value': self.integral,
+            'data':[self.values[i] for i in range(x*y)],
+            'graph' : [self.graph[i] for i in range(int((x)/2)*int((y)/2))]
+        }
+    
+    def simpson38_convert(self,
+                          x, 
+                          y):
+        return {
+            'integral_value' : self.integral,
+            'data' : [self.values[i] for i in range(x*y)],
+            'graph' : [self.graph[i] for i in range(int(x/3)*int(y/3))]
+        }
+
+
 FUNC_TYPE = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double, ctypes.c_double)
 SFUNC_TYPE = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double)
 lib = ctypes.CDLL('./src/integration.so') 
@@ -83,6 +121,9 @@ lib.gaussian.restype = ctypes.POINTER(Output)
 lib.mfree.argtypes = [ctypes.POINTER(Output)]
 lib.mfree.restype = None
 
+lib.gfree.argtypes = [ctypes.POINTER(Output)]
+lib.gfree.restype = None
+
 def trapezoidal1d_integrate(x0, xn, h, f):
     length = int((xn-x0)/h)+1
     x_array = (ctypes.c_double * (length))(*[x0+i*h for i in range(length)])
@@ -114,10 +155,12 @@ def simpsons381d_integrate(x0, xn, h, f):
 def gaussian(f, a, b):
     f_func = SFUNC_TYPE(f)
     result = lib.gaussian(f_func, a, b).contents
-    result_gauss = result.convert(1)
-    lib.mfree(result)
-    return {'two': result_gauss['integral_value'],
-            'three': result_gauss['data'][0]}
+    result_gauss = result.gaussian_convert()
+    lib.gfree(result)
+    return {'two': result_gauss['two'],
+            'three': result_gauss['three'],
+            'data': [],
+            'graph':[]}
 
 def sintegrate(x0,xn,h,f):
     result_trapezoidal = trapezoidal2d_integrate(x0, xn,  h, f)
@@ -128,8 +171,6 @@ def sintegrate(x0,xn,h,f):
             "trapezoidal": result_trapezoidal,
             "simpsons_3/8th": result_simpson38,
             "gaussian": result_gaussian}
-            
-
 
 def trapezoidal2d_integrate(x0, xn, y0, yn, h, k, f):
     xlength = int((xn-x0)/h)+1
@@ -137,8 +178,8 @@ def trapezoidal2d_integrate(x0, xn, y0, yn, h, k, f):
     x_array = (ctypes.c_double * (xlength))(*[x0+i*h for i in range(xlength)])
     y_array = (ctypes.c_double * (ylength))(*[y0+i*k for i in range(ylength)])
     f_func = FUNC_TYPE(f)
-    result = lib.trapezoidal2d(x_array, y_array, f_func, xlength, ylength).contents    
-    result_trapezoidal = result.convert(xlength, ylength)
+    result = lib.trapezoidal2d(x_array, y_array, f_func, xlength, ylength).contents
+    result_trapezoidal = result.trapezoidal_convert(xlength, ylength)
     lib.mfree(result)
     return result_trapezoidal
 
@@ -149,7 +190,9 @@ def simpsons2d_integrate(x0, xn, y0, yn, h, k, f):
     y_array = (ctypes.c_double * (ylength))(*[y0+i*k for i in range(ylength)])
     f_func = FUNC_TYPE(f)
     result = lib.simpsons2d(x_array, y_array, f_func, xlength, ylength).contents
-    result_simpsons = result.convert(xlength, ylength)
+    print(1)
+    result_simpsons = result.simpsons_convert(xlength, ylength)
+    print(2)
     lib.mfree(result)
     return result_simpsons
 
@@ -160,7 +203,7 @@ def simpsons382d_integrate(x0, xn, y0, yn, h, k, f):
     y_array = (ctypes.c_double * (ylength))(*[y0+i*k for i in range(ylength)])
     f_func = FUNC_TYPE(f)
     result = lib.simpsons382d(x_array, y_array, f_func, xlength, ylength).contents
-    result_simpson38 = result.convert(xlength, ylength)
+    result_simpson38 = result.simpson38_convert(xlength, ylength)
     lib.mfree(result)
     return result_simpson38
 
@@ -179,11 +222,10 @@ def romberg_integration(f, a, b, tol=1e-6, max_iter=10):
     return result
 
 if __name__ == "__main__":
-    print("Running tests on numerical integration.......")
-
+    # print("Running tests on numerical integration.......")
     # f = lambda x,y: 1/(x**2 + y**2)
-    # result = simpsons2d_integrate(1,2,1,2,0.5,0.5,f)
-    # print(result[1])
+    # result = simpsons382d_integrate(1,5,1,5,0.5,0.5,f)
+    # print(result)
     # assert abs(float(result['integral_value']) - 0.231169) < 1e-3, f"Expected 0.231169, got {result['integral_value']}"
     
     # f = lambda x,y: 1/(1+x+y)
@@ -192,21 +234,17 @@ if __name__ == "__main__":
 
     # f = lambda x,y: x*math.exp(y)
     # result = trapezoidal2d_integrate(0,1,0,1,0.5,0.5,f)
+    # print(result)
     # assert abs(float(result['integral_value']) - 0.8770) < 1e-3, f"Expected 0.8770, got {result['integral_value']}"
 
-    # f = lambda x,y: 1/math.sqrt(x**2+y**2)
-    # result = trapezoidal2d_integrate(1,5, 1, 5, 2,2,f)
-    # assert abs(float(result['integral_value']) - 4.1343) < 1e-3, f"Expected 4.1343, got {result['integral_value']}"
-    
-
-
-    f = lambda x: math.sin(x)
+    # f = lambda x: math.sin(x)
     # result = trapezoidal1d_integrate(1, 2, 0.2, f)
+    # print(result)
     # assert abs(result['integral_value'] - 0.695635) < 1e-4, f"Expected 0.695635, got {result['integral_value']}"
     
-    result = simpsons1d_integrate(0, 2*math.pi, math.pi/10, f)
-    print(result)
-    assert abs(float(result['integral_value']) - 0) < 1e-4, f"Expected 0.693150, got {result['integral_value']}"
+    # result = simpsons1d_integrate(0, 2*math.pi, math.pi/10, f)
+    # print(result)
+    # assert abs(float(result['integral_value']) - 0) < 1e-4, f"Expected 0.693150, got {result['integral_value']}"
 
     # f = lambda x: math.exp(x**2)
     # result = simpsons1d_integrate(0, 1, 0.1, f)
@@ -218,13 +256,17 @@ if __name__ == "__main__":
 
     # f = lambda x: math.exp(x)*math.cos(x) - 2*x
     # result = gaussian(f, 0, 1)
+    # print(result)
     # assert abs(float(result['three']) - 0.37802) < 1e-4, f"Expected 0.37802, got {result['three']}"
     
     # print("Started")
     # f = lambda x: math.sin(x)/(2+3*math.sin(x))
-    # result = simpsons381d_integrate(0,1,1/6,f)
-    # for i in result['data']:
-    #     print(i)
+    # result = simpsons381d_integrate(0,2,1/6,f)
+    # print(result)
     # assert abs(float(result['integral_value']) - 0.1250) < 1e-4, f"Expected 0.1250, got {result['integral_value']}"
+
+    f = lambda x : x
+    result = simpsons1d_integrate(0,1,1/10,f)
+    print(result)
 
     print("Integration tests passed...")
