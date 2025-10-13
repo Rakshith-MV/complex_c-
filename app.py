@@ -990,7 +990,6 @@ class Application:
         we shall build meshes and implement the barplot
         
         """
-        messagebox.showinfo("1")
         if self.integration_type.get() == 'single':
             if self.integration_method.get() == 'trapezoidal':
                 h = X[1] - X[0]
@@ -1010,7 +1009,6 @@ class Application:
                         self.integration_ax.fill_between(points,0,f[j],color='lightblue',alpha=0.5)
         else:
             if self.integration_method.get() == 'trapezoidal':
-                messagebox.showinfo("2")     
                 h = X[1]-X[0]   #probably not required to create another mesh
                 k = Y[1]-Y[0]
                 x_vals = X[:-1]
@@ -1019,13 +1017,8 @@ class Application:
                 x_vals = x.ravel()
                 y_vals = y.ravel()
                 base = np.zeros_like(f)
-                # with open("debug.txt",'w+') as ff:
-                #     ff.write(f"x_vals: {x_vals} : {len(x_vals)}\n")
-                #     ff.write(f"y_vals: {y_vals} : {len(y_vals)}\n")
-                #     ff.write(f"f: {f}, : {len(f)}\n")
-                #     # f.write(f"base: {base} : {len(base)}\n ")
-                #     # f.write(f"h: {h}\n")
                 self.integration_ax.bar3d(x_vals, y_vals, base, h, k, f, shade=True, alpha=0.5)
+            
             if self.integration_method.get() == 'simpsons':
                 h = X[1]-X[0]
                 k = Y[1]-Y[0]
@@ -1037,50 +1030,35 @@ class Application:
                 base = np.zeros_like(f)
                 self.integration_ax.bar3d(x_vals, y_vals, base, 2*h, 2*k, f, shade=True, alpha=0.5)
 
-            if self.integration_method.get() == 'simpsons38':
-                messagebox.showinfo("3")
-                h = X[1]-X[0]
-                k = Y[1]-Y[0]
+            # if self.integration_method.get() == 'simpsons38':
+            #     messagebox.showinfo("3")
+            #     h = X[1]-X[0]
+            #     k = Y[1]-Y[0]
                 
-                # Fix: Create grid points at intervals of 3*h and 3*k
-                x_vals = [X[0] + 3*i*h for i in range(int(len(X)/3))]
-                y_vals = [Y[0] + 3*j*k for j in range(int(len(Y)/3))]
+            #     # Fix: Create grid points at intervals of 3*h and 3*k
+            #     x_vals = [X[0] + 3*i*h for i in range(int(len(X)/3))]
+            #     y_vals = [Y[0] + 3*j*k for j in range(int(len(Y)/3))]
                 
-                # Don't use meshgrid and ravel - create the positions directly
-                x_pos = []
-                y_pos = []
-                for y in y_vals:
-                    for x in x_vals:
-                        x_pos.append(x)
-                        y_pos.append(y)
+            #     # Don't use meshgrid and ravel - create the positions directly
+            #     x_pos = []
+            #     y_pos = []
+            #     for y in y_vals:
+            #         for x in x_vals:
+            #             x_pos.append(x)
+            #             y_pos.append(y)
                 
-                x_pos = np.array(x_pos)
-                y_pos = np.array(y_pos)
-                base = np.zeros_like(f)
+            #     x_pos = np.array(x_pos)
+            #     y_pos = np.array(y_pos)
+            #     base = np.zeros_like(f)
                 
-                with open("debug.txt",'w+') as ff:
-                    ff.write(f"x_pos: {x_pos} : {len(x_pos)}\n")
-                    ff.write(f"y_pos: {y_pos} : {len(y_pos)}\n")
-                    ff.write(f"f: {f}, : {len(f)}\n")
-                    ff.write(f"base: {base} : {len(base)}\n")
+            #     with open("debug.txt",'w+') as ff:
+            #         ff.write(f"x_pos: {x_pos} : {len(x_pos)}\n")
+            #         ff.write(f"y_pos: {y_pos} : {len(y_pos)}\n")
+            #         ff.write(f"f: {f}, : {len(f)}\n")
+            #         ff.write(f"base: {base} : {len(base)}\n")
                 
-                self.integration_ax.bar3d(x_pos, y_pos, base, 3*h, 3*k, f, shade=True, alpha=0.5)
+            #     self.integration_ax.bar3d(x_pos, y_pos, base, 3*h, 3*k, f, shade=True, alpha=0.5)
                 
-                # messagebox.showinfo("3")
-                # h = X[1]-X[0]
-                # k = Y[1]-Y[0]
-                # x_vals = [X[0] + 3*i*h for i in range(int(len(X)/3))]
-                # y_vals = [Y[0] + 3*i*k for i in range(int(len(Y)/3))]
-                # x, y = np.meshgrid(x_vals, y_vals)
-                # x_vals = x.ravel()
-                # y_vals = y.ravel()
-                # base = np.zeros_like(f)
-                # with open("debug.txt",'w+') as ff:
-                #     ff.write(f"x_vals: {x_vals} : {len(x_vals)}\n")
-                #     ff.write(f"y_vals: {y_vals} : {len(y_vals)}\n")
-                #     ff.write(f"f: {f}, : {len(f)}\n")
-                #     ff.write(f"base: {base} : {len(base)}\n ")
-                # self.integration_ax.bar3d(x_vals, y_vals, base, 3*h, 3*k, f, shade=True, alpha=0.5) 
 
     def clear_integration(self):
         """Clear all integration inputs and results"""
@@ -1228,7 +1206,7 @@ class Application:
                     h = float(sympify(self.h_double_entry.get(), locals={'pi': pi, 'e': E}))
                     k = float(sympify(self.k_entry.get(), locals={'pi': pi, 'e': E}))
 
-                    if(self.integration_method.get() in ['romberg', 'gaussian']):
+                    if(self.integration_method.get() in ['romberg', 'gaussian','simpsons38']):
                         messagebox.showinfo("Info", f"{self.integration_method.get().replace('_', ' ').title()} method isn't active yet for double integral")
                         return
                     

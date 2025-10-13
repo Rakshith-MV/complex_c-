@@ -17,7 +17,6 @@ class Output(ctypes.Structure):
                 'integral_value': self.integral,
                 'graph': graph}
         except Exception as e:
-            print("The exception is ", e)
             return {'data':None,
                 'integral_value': self.integral,
                 'graph': None}
@@ -40,19 +39,21 @@ class Output(ctypes.Structure):
     def simpsons_convert(self,
                          x,
                          y):
+        temp = int(self.graph[0])
         return {
             'integral_value': self.integral,
             'data':[self.values[i] for i in range(x*y)],
-            'graph' : [self.graph[i] for i in range(int((x)/2)*int((y)/2))]
+            'graph' : [self.graph[i] for i in range(1, temp+1)]
         }
     
     def simpson38_convert(self,
                           x, 
                           y):
+        temp = int(self.graph[0])
         return {
             'integral_value' : self.integral,
             'data' : [self.values[i] for i in range(x*y)],
-            'graph' : [self.graph[i] for i in range(int(x/3)*int(y/3))]
+            'graph' : [self.graph[i] for i in range(1, temp+1)]
         }
 
 
@@ -190,9 +191,7 @@ def simpsons2d_integrate(x0, xn, y0, yn, h, k, f):
     y_array = (ctypes.c_double * (ylength))(*[y0+i*k for i in range(ylength)])
     f_func = FUNC_TYPE(f)
     result = lib.simpsons2d(x_array, y_array, f_func, xlength, ylength).contents
-    print(1)
     result_simpsons = result.simpsons_convert(xlength, ylength)
-    print(2)
     lib.mfree(result)
     return result_simpsons
 

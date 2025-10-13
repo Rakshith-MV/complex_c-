@@ -8,10 +8,11 @@
 #endif
 
 double trap(double*, int, int);
-double multiply(double*, double*, int);
+double multiply(double*, double*, const int);
+double multiply2d(double*, double*, const int, const int, const int, const int, const int);
 double simp(double*, double*,int, int);
 double simp38(double*, double*, int, int);
-double function( double, double);
+// double function( double, double);
 double roundn(double , int );
 
 
@@ -142,14 +143,14 @@ EXPORT output* trapezoidal2d(const double* x, const double* y, double (*func)(do
     output* out = malloc(sizeof(output));
     out->values = malloc(xlength * ylength * sizeof(double));
     out->graph = malloc((xlength-1) *(ylength -1)*sizeof(double));
-    for (int i = 0; i < xlength; i++) {
-        for (int j = 0; j < ylength; j++) {
-            out->values[i * ylength + j] = roundn(func(x[i], y[j]), 5);
+    for (int j = 0; j < ylength; j++) {
+        for (int i = 0; i < xlength; i++) {
+            out->values[j * ylength + i] = roundn(func(x[i], y[j]), 5);
         }
     }
-    for(int i = 0; i < xlength-1; i++){
-        for(int j = 0; j < ylength-1; j++){
-            out->graph[i*(ylength-1) + j] = (out->values[i*(ylength-1)+j] + out->values[i*(ylength-1)+j+1])/2;
+    for(int j = 0; j < ylength-1; j++){
+        for(int i = 0; i < xlength-1; i++){
+            out->graph[j*(ylength-1) + i] = (out->values[j*(ylength)+i] + out->values[j*(ylength)+i+1])/2;
         }
     }
     out->integral = (x[1]-x[0])*(y[1]-y[0])*trap(out->values, xlength, ylength)/4;
@@ -178,7 +179,7 @@ EXPORT output* simpsons382d(double* x, double* y, double (*func)(double, double)
             out->values[i * ylength + j] = roundn(func(x[i], y[j]), 5);
         }
     }
-    double simpsons =  simp38(out->values, out->graph, xlength, ylength);
+    double simpsons =  (9/64)*(x[1]-x[0])*(y[1]-y[0])*simp38(out->values, out->graph, xlength, ylength);
     out->integral = simpsons;
     return out;
 }
@@ -207,13 +208,21 @@ double simp(double* values, double* graph, int xlength, int ylength){
     double matrix[9] = {1,4,1,4,16,4,1,4,1};
     double sum = 0;
     double temp = 0;
+    int mindex = 0;
     int index = 1;
-    for(int i = 1; i < xlength; i+=2){
-        for (int j=1; j < ylength; j+=2){
-            temp = multiply(values+(i-1)*ylength+(j-1), matrix, 3);
+    for(int i = 1; i < ylength; i+=2){
+        for (int j=1; j < xlength; j+=2){
+            temp = 0;           
+            for(int k = j-1; k < j+2; k++){
+                for(int l = i-1; l < i+2; l++){
+                    temp += values[k* xlength + l]*matrix[mindex];
+                    mindex++;
+                }
+            }
             sum += temp;
-            graph[index] = temp/16;
+            graph[index] = temp/36;
             index++;
+            mindex = 0;
         }
     }
     graph[0] = index-1;
@@ -221,28 +230,83 @@ double simp(double* values, double* graph, int xlength, int ylength){
 }
 
 double simp38(double* values, double* graph, int xlength, int ylength){
-    double matrix[16] = {1,3,3,1,3,9,9,3,3,9,9,3,1,3,3,1};
-    double sum = 0;
-    double temp = 0;
+    double matrix38[16] = {
+        1, 3, 3, 1,    // l=0..3 for k=0
+        3, 9, 9, 3,    // l=0..3 for k=1
+        3, 9, 9, 3,    // l=0..3 for k=2
+        1, 3, 3, 1     // l=0..3 for k=3
+    };
+    
+    double sum = 0.0;
+    double temp = 0.0;
+    int mindex = 0;
     int index = 1;
-    for(int i = 1; i < xlength; i+=3){
-        for (int j=1; j < ylength; j+=3){
-            temp = multiply(values+(i-1)*ylength+(j-1), matrix, 4);
+    for(int i = 0; i < ylength - 3; i += 3){ // i is the starting y-index (row)
+        for (int j = 0; j < xlength - 3; j += 3){ // j is the starting x-index (column)
+            temp = 0.0;
+            mindex = 0;
+
+            // Loop over the 4x4 block using kernel indices k (x) and l (y)
+            for(int k = j; k < j + 4; k++){ // k: x-kernel index (0 to 3 relative to j)
+                for(int l = i; l < i + 4; l++){ // l: y-kernel index (0 to 3 relative to i)
+                    temp += values[k * xlength + l] * matrix38[mindex];
+                    mindex++;
+                }
+            }
+
             sum += temp;
-            graph[index] = temp/64;
+            
+            // Store the weighted sum divided by the total kernel weight (64).
+            graph[index] = temp / 64.0;
             index++;
         }
     }
-    graph[0]= index-1;
-    return 3*sum/8;
+    
+    // The first element of graph stores the total count of 4x4 blocks processed.
+    graph[0] = (double)(index - 1);
+    
+    // The returned sum is proportional to the total integral:
+    // Integral approximation I ≈ (9 * h * k / 64) * sum
+    return sum;
 }
+// double simp38(double* values, double* graph, int xlength, int ylength){
+//     double matrix[16] = {1,3,3,1,3,9,9,3,3,9,9,3,1,3,3,1};
+//     double sum = 0;
+//     double temp = 0;
+//     int index = 1;
+//     for(int i = 1; i+2 < xlength; i+=3){
+//         for (int j=1; j+2 < ylength; j+=3){
+//             temp = multiply(values+(i-1)*ylength+(j-1), matrix, 4);
+//             sum += temp;
+//             graph[index] = temp/64;
+//             index++;
+//         }
+//     }
+//     graph[0]= index-1;
+//     return 3*sum/8;
+// }
 
-double multiply(double* a, double* b, int length){
+double multiply(double* a, double* b,  const int length){
     double sum = 0;
     for(int i = 0; i<length; i++){
         for(int j = 0; j < length; j++){
             sum += (a[i * length + j] * b[i * length + j]);
         }
+    }
+    return sum;
+}
+
+double multiply2d(double* a, double* b, const int xlength, const int ylength, const int xind, const int yind, const int length){
+    double sum = 0;
+    int index = 0;
+    printf("%d, %d : \n", xind, yind);
+    for(int i = yind; i < length; i++){
+        for(int j = xind; j < length; j++){
+            printf("%f ", a[i * xlength + j]);
+            sum += (a[i * xlength + j] * b[index]);
+            index++;
+        }
+        printf("\n");
     }
     return sum;
 }
@@ -256,29 +320,29 @@ double roundn(double num, int n) {
     return rounded_shifted_num / pow(10, n);
 }
 
-double function(double x, double y){
-    return 1/sqrt(x*x + y*y);
-}
+// double function(double x, double y){
+//     return 1/sqrt(x*x + y*y);
+// }
 
-int main(){
-    double x[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0};
-    double y[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0}; 
+// int main(){
+//     double x[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0};
+//     double y[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0}; 
 
-    output *k = simpsons382d(x, y, function, 7, 7);
-    printf("Integral : %f\n", k->integral);
-    for(int i = 0; i < 7*7; i++){
-        if (i % 5 == 0){
-            printf("\n");
-        }
-        printf("%f\n ", k->values[i]);
-    }
-    printf("Graphs \n");
-    for(int i = 0; i < 4; i++){
-        if (i % 2 == 0){
-            printf("\n");
-        }
-        printf("%f\n ", k->graph[i]);
-    }
-    printf("\n");
-    mfree(k);
-}
+//     output *k = simpsons382d(x, y, function, 7, 7);
+//     printf("Integral : %f\n", k->integral);
+//     for(int i = 0; i < 7*7; i++){
+//         if (i % 5 == 0){
+//             printf("\n");
+//         }
+//         printf("%f\n ", k->values[i]);
+//     }
+//     printf("Graphs \n");
+//     for(int i = 0; i < 4; i++){
+//         if (i % 2 == 0){
+//             printf("\n");
+//         }
+//         printf("%f\n ", k->graph[i]);
+//     }
+//     printf("\n");
+//     mfree(k);
+// }
